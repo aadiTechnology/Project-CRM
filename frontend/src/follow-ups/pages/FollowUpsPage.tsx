@@ -18,6 +18,8 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { ColumnChooser } from '../../column-visibility/ColumnChooser'
+import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import {
@@ -44,11 +46,6 @@ import { useAuth } from '../../store/auth-context'
 type SessionTally = { connected: number; noAnswer: number; snoozed: number; skipped: number }
 
 const STEP_PALETTE = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#64748b', '#0ea5e9', '#f43f5e']
-
-const ROW_COLS = {
-  xs: 'minmax(0,1fr)',
-  md: 'minmax(0,1fr) 118px 84px 110px 148px',
-} as const
 
 const actionIconSx = {
   width: 30,
@@ -77,6 +74,19 @@ export function FollowUpsPage() {
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
+  const {
+    columns: columnDefs,
+    visibility: columnVisibility,
+    isVisible: isColumnVisible,
+    toggle: toggleColumn,
+    reset: resetColumns,
+    gridTemplateMd: followUpsGridMd,
+    gridTemplateXs: followUpsGridXs,
+    loadError: columnLoadError,
+    saveError: columnSaveError,
+    clearSaveError: clearColumnSaveError,
+    clearLoadError: clearColumnLoadError,
+  } = useColumnVisibility('follow-ups')
 
   const [items, setItems] = useState<Lead[]>([])
   const [projects, setProjects] = useState<LeadProjectOption[]>([])
@@ -98,6 +108,20 @@ export function FollowUpsPage() {
     const timer = window.setTimeout(() => setNotice(''), 1600)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (columnSaveError) {
+      setError("Couldn't save column preferences on this device. Layout kept; try again.")
+      clearColumnSaveError()
+    }
+  }, [columnSaveError, clearColumnSaveError])
+
+  useEffect(() => {
+    if (columnLoadError) {
+      setError('Column preferences could not be loaded. Showing all columns.')
+      clearColumnLoadError()
+    }
+  }, [columnLoadError, clearColumnLoadError])
 
   useEffect(() => {
     void (async () => {
@@ -251,6 +275,14 @@ export function FollowUpsPage() {
             </MenuItem>
           ))}
         </TextField>
+        <Box sx={{ ml: { sm: 'auto' }, alignSelf: { xs: 'flex-end', sm: 'center' } }}>
+          <ColumnChooser
+            columns={columnDefs}
+            visibility={columnVisibility}
+            onToggle={toggleColumn}
+            onReset={resetColumns}
+          />
+        </Box>
       </Stack>
 
       <Box
@@ -267,7 +299,7 @@ export function FollowUpsPage() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: ROW_COLS.md,
+              gridTemplateColumns: followUpsGridMd,
               columnGap: 1.25,
               alignItems: 'center',
               px: 2,
@@ -279,15 +311,31 @@ export function FollowUpsPage() {
             <Typography variant="caption" fontWeight={700} color="text.secondary">
               Lead
             </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Plan
-            </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Priority
-            </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Due
-            </Typography>
+            {isColumnVisible('project') ? (
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Project
+              </Typography>
+            ) : null}
+            {isColumnVisible('phone') ? (
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Phone
+              </Typography>
+            ) : null}
+            {isColumnVisible('plan') ? (
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Plan
+              </Typography>
+            ) : null}
+            {isColumnVisible('priority') ? (
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Priority
+              </Typography>
+            ) : null}
+            {isColumnVisible('due') ? (
+              <Typography variant="caption" fontWeight={700} color="text.secondary">
+                Due
+              </Typography>
+            ) : null}
             <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
               Actions
             </Typography>
@@ -309,7 +357,10 @@ export function FollowUpsPage() {
                 key={lead.id}
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: ROW_COLS,
+                  gridTemplateColumns: {
+                    xs: followUpsGridXs,
+                    md: followUpsGridMd,
+                  },
                   columnGap: 1.25,
                   rowGap: 0.75,
                   alignItems: 'center',
@@ -340,50 +391,62 @@ export function FollowUpsPage() {
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap display="block">
                       {lead.lead_number}
-                      {lead.project_name ? ` · ${lead.project_name}` : ''} ·{' '}
-                      <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                        {lead.mobile}
-                      </Box>
                     </Typography>
                   </Box>
                 </Stack>
 
-                <Chip
-                  size="small"
-                  label={planLabel}
-                  sx={{
-                    justifySelf: 'start',
-                    bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
-                    color,
-                    fontWeight: 600,
-                    borderRadius: '999px',
-                  }}
-                />
-                <Chip
-                  size="small"
-                  label={PRIORITY_LABEL[priorityKey]}
-                  sx={{
-                    justifySelf: 'start',
-                    bgcolor: PRIORITY_TONE[priorityKey].bg,
-                    color: PRIORITY_TONE[priorityKey].color,
-                    fontWeight: 600,
-                    borderRadius: '999px',
-                  }}
-                />
-                <Stack
-                  direction="row"
-                  spacing={0.5}
-                  sx={{
-                    alignItems: 'center',
-                    color: due.overdue ? '#b91c1c' : due.when === 't' ? '#b45309' : '#334155',
-                    fontWeight: due.overdue || due.when === 't' ? 600 : 500,
-                    fontSize: 13,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <TodayOutlinedIcon sx={{ fontSize: 15 }} />
-                  {due.label}
-                </Stack>
+                {isColumnVisible('project') ? (
+                  <Typography variant="body2" noWrap sx={{ color: 'text.secondary' }}>
+                    {lead.project_name || '—'}
+                  </Typography>
+                ) : null}
+                {isColumnVisible('phone') ? (
+                  <Typography variant="body2" noWrap sx={{ color: 'primary.main', fontWeight: 600 }}>
+                    {lead.mobile || '—'}
+                  </Typography>
+                ) : null}
+                {isColumnVisible('plan') ? (
+                  <Chip
+                    size="small"
+                    label={planLabel}
+                    sx={{
+                      justifySelf: 'start',
+                      bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
+                      color,
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                    }}
+                  />
+                ) : null}
+                {isColumnVisible('priority') ? (
+                  <Chip
+                    size="small"
+                    label={PRIORITY_LABEL[priorityKey]}
+                    sx={{
+                      justifySelf: 'start',
+                      bgcolor: PRIORITY_TONE[priorityKey].bg,
+                      color: PRIORITY_TONE[priorityKey].color,
+                      fontWeight: 600,
+                      borderRadius: '999px',
+                    }}
+                  />
+                ) : null}
+                {isColumnVisible('due') ? (
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    sx={{
+                      alignItems: 'center',
+                      color: due.overdue ? '#b91c1c' : due.when === 't' ? '#b45309' : '#334155',
+                      fontWeight: due.overdue || due.when === 't' ? 600 : 500,
+                      fontSize: 13,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <TodayOutlinedIcon sx={{ fontSize: 15 }} />
+                    {due.label}
+                  </Stack>
+                ) : null}
 
                 {canUpdate ? (
                   <Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}>

@@ -208,6 +208,7 @@ def create_field(
         options=payload.options,
         is_required=payload.is_required,
         show_in_list=payload.show_in_list,
+        show_as_column=payload.show_as_column,
         is_active=payload.is_active,
         sort_order=int(max_order or 0) + 1,
         created_at=now,
@@ -276,6 +277,8 @@ def update_field(
         field.is_required = payload.is_required
     if "show_in_list" in fields_set and payload.show_in_list is not None:
         field.show_in_list = payload.show_in_list
+    if "show_as_column" in fields_set and payload.show_as_column is not None:
+        field.show_as_column = payload.show_as_column
     if "is_active" in fields_set and payload.is_active is not None:
         field.is_active = payload.is_active
 

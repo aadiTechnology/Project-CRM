@@ -28,6 +28,8 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 
+import { ColumnChooser } from '../../column-visibility/ColumnChooser'
+import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
@@ -81,11 +83,6 @@ const PRI_TONE: Record<LeadPriority, { bg: string; color: string }> = {
 const PRI_RANK: Record<LeadPriority, number> = { high: 0, medium: 1, low: 2 }
 const STEP_PALETTE = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#64748b', '#0ea5e9', '#f43f5e']
 
-const REMINDER_ROW_COLS = {
-  xs: '22px minmax(0,1fr)',
-  md: '22px minmax(0,1fr) 118px 84px 100px 108px 168px',
-} as const
-
 const actionIconSx = {
   width: 30,
   height: 30,
@@ -106,6 +103,19 @@ export function RemindersPage() {
   const { user } = useAuth()
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
+  const {
+    columns: columnDefs,
+    visibility: columnVisibility,
+    isVisible: isColumnVisible,
+    toggle: toggleColumn,
+    reset: resetColumns,
+    gridTemplateMd: remindersGridMd,
+    gridTemplateXs: remindersGridXs,
+    loadError: columnLoadError,
+    saveError: columnSaveError,
+    clearSaveError: clearColumnSaveError,
+    clearLoadError: clearColumnLoadError,
+  } = useColumnVisibility('reminders')
 
   const [leads, setLeads] = useState<Lead[]>([])
   const [projects, setProjects] = useState<LeadProjectOption[]>([])
@@ -142,6 +152,20 @@ export function RemindersPage() {
     const timer = window.setTimeout(() => setNotice(''), 1600)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (columnSaveError) {
+      setError("Couldn't save column preferences on this device. Layout kept; try again.")
+      clearColumnSaveError()
+    }
+  }, [columnSaveError, clearColumnSaveError])
+
+  useEffect(() => {
+    if (columnLoadError) {
+      setError('Column preferences could not be loaded. Showing all columns.')
+      clearColumnLoadError()
+    }
+  }, [columnLoadError, clearColumnLoadError])
 
   const loadProjects = useCallback(async () => {
     const result = await api.get<{ items: LeadProjectOption[] }>('/api/v1/projects')
@@ -396,6 +420,12 @@ export function RemindersPage() {
         <Typography variant="h1" sx={{ flex: 1 }}>
           Reminders
         </Typography>
+        <ColumnChooser
+          columns={columnDefs}
+          visibility={columnVisibility}
+          onToggle={toggleColumn}
+          onReset={resetColumns}
+        />
         {canUpdate ? (
           <Tooltip title="Add reminder">
             <IconButton
@@ -538,7 +568,7 @@ export function RemindersPage() {
             <Box
               sx={{
                 display: { xs: 'none', md: 'grid' },
-                gridTemplateColumns: REMINDER_ROW_COLS.md,
+                gridTemplateColumns: remindersGridMd,
                 columnGap: 1.25,
                 alignItems: 'center',
                 width: '100%',
@@ -569,18 +599,36 @@ export function RemindersPage() {
               <Typography variant="caption" fontWeight={700} color="text.secondary">
                 Lead
               </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Plan
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Priority
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Due
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Status
-              </Typography>
+              {isColumnVisible('project') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Project
+                </Typography>
+              ) : null}
+              {isColumnVisible('phone') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Phone
+                </Typography>
+              ) : null}
+              {isColumnVisible('plan') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Plan
+                </Typography>
+              ) : null}
+              {isColumnVisible('priority') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Priority
+                </Typography>
+              ) : null}
+              {isColumnVisible('due') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Due
+                </Typography>
+              ) : null}
+              {isColumnVisible('status') ? (
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Status
+                </Typography>
+              ) : null}
               <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
                 Actions
               </Typography>
@@ -600,7 +648,10 @@ export function RemindersPage() {
                   onClick={() => openLead(lead)}
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: REMINDER_ROW_COLS,
+                    gridTemplateColumns: {
+                      xs: remindersGridXs,
+                      md: remindersGridMd,
+                    },
                     columnGap: { xs: 1, md: 1.25 },
                     rowGap: 0.75,
                     alignItems: 'center',
@@ -647,69 +698,100 @@ export function RemindersPage() {
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap display="block">
                         {lead.lead_number}
-                        {lead.project_name ? ` · ${lead.project_name}` : ''} ·{' '}
-                        <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                          {lead.mobile}
-                        </Box>
                       </Typography>
                     </Box>
                   </Stack>
 
-                  <Chip
-                    size="small"
-                    label={step}
-                    sx={{
-                      justifySelf: 'start',
-                      gridColumn: { xs: '2', md: 'auto' },
-                      ml: { xs: '54px', md: 0 },
-                      bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
-                      color,
-                      fontWeight: 600,
-                      borderRadius: '999px',
-                    }}
-                  />
-                  <Chip
-                    size="small"
-                    label={PRIORITY_LABEL[priorityKey]}
-                    sx={{
-                      justifySelf: 'start',
-                      gridColumn: { xs: '2', md: 'auto' },
-                      ml: { xs: '54px', md: 0 },
-                      bgcolor: pri.bg,
-                      color: pri.color,
-                      fontWeight: 600,
-                      borderRadius: '999px',
-                    }}
-                  />
-                  <Stack
-                    direction="row"
-                    spacing={0.5}
-                    sx={{
-                      alignItems: 'center',
-                      gridColumn: { xs: '2', md: 'auto' },
-                      ml: { xs: '54px', md: 0 },
-                      color: bucket === 'o' ? '#b91c1c' : bucket === 't' ? '#b45309' : '#334155',
-                      fontWeight: bucket === 'o' || bucket === 't' ? 600 : 500,
-                      fontSize: 13,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <TodayOutlinedIcon sx={{ fontSize: 15 }} />
-                    {formatDueLabel(lead.next_followup_at)}
-                  </Stack>
-                  <Chip
-                    size="small"
-                    label={tone.label}
-                    sx={{
-                      justifySelf: 'start',
-                      gridColumn: { xs: '2', md: 'auto' },
-                      ml: { xs: '54px', md: 0 },
-                      bgcolor: tone.bg,
-                      color: tone.color,
-                      fontWeight: 600,
-                      borderRadius: '999px',
-                    }}
-                  />
+                  {isColumnVisible('project') ? (
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        color: 'text.secondary',
+                      }}
+                    >
+                      {lead.project_name || '—'}
+                    </Typography>
+                  ) : null}
+                  {isColumnVisible('phone') ? (
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        color: 'primary.main',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {lead.mobile || '—'}
+                    </Typography>
+                  ) : null}
+                  {isColumnVisible('plan') ? (
+                    <Chip
+                      size="small"
+                      label={step}
+                      sx={{
+                        justifySelf: 'start',
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
+                        color,
+                        fontWeight: 600,
+                        borderRadius: '999px',
+                      }}
+                    />
+                  ) : null}
+                  {isColumnVisible('priority') ? (
+                    <Chip
+                      size="small"
+                      label={PRIORITY_LABEL[priorityKey]}
+                      sx={{
+                        justifySelf: 'start',
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        bgcolor: pri.bg,
+                        color: pri.color,
+                        fontWeight: 600,
+                        borderRadius: '999px',
+                      }}
+                    />
+                  ) : null}
+                  {isColumnVisible('due') ? (
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{
+                        alignItems: 'center',
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        color: bucket === 'o' ? '#b91c1c' : bucket === 't' ? '#b45309' : '#334155',
+                        fontWeight: bucket === 'o' || bucket === 't' ? 600 : 500,
+                        fontSize: 13,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <TodayOutlinedIcon sx={{ fontSize: 15 }} />
+                      {formatDueLabel(lead.next_followup_at)}
+                    </Stack>
+                  ) : null}
+                  {isColumnVisible('status') ? (
+                    <Chip
+                      size="small"
+                      label={tone.label}
+                      sx={{
+                        justifySelf: 'start',
+                        gridColumn: { xs: '2', md: 'auto' },
+                        ml: { xs: '54px', md: 0 },
+                        bgcolor: tone.bg,
+                        color: tone.color,
+                        fontWeight: 600,
+                        borderRadius: '999px',
+                      }}
+                    />
+                  ) : null}
 
                   {canUpdate ? (
                     <Stack

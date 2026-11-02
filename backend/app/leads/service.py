@@ -321,6 +321,9 @@ def create_lead(
         address=payload.address,
         requirement=payload.requirement,
         expected_value=payload.expected_value,
+        enquiry_date=payload.enquiry_date,
+        reference_name=payload.reference_name,
+        call_summary=payload.call_summary,
         lead_source=payload.lead_source,
         owner_id=owner_id,
         created_by_id=actor.id,
@@ -417,6 +420,15 @@ def update_lead(
     if "expected_value" in fields:
         lead.expected_value = payload.expected_value
         changed.append("expected_value")
+    if "enquiry_date" in fields:
+        lead.enquiry_date = payload.enquiry_date
+        changed.append("enquiry_date")
+    if "reference_name" in fields:
+        lead.reference_name = payload.reference_name
+        changed.append("reference_name")
+    if "call_summary" in fields:
+        lead.call_summary = payload.call_summary
+        changed.append("call_summary")
     if "lead_source" in fields:
         lead.lead_source = payload.lead_source
         changed.append("lead_source")

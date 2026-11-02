@@ -28,6 +28,9 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
+import { ColumnChooser } from '../../column-visibility/ColumnChooser'
+import type { ColumnDef } from '../../column-visibility/definitions'
+import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManager'
@@ -81,15 +84,23 @@ type LeadForm = {
   full_name: string
   mobile: string
   email: string
-  company_name: string
   city: string
   lead_source: string
   requirement: string
-  expected_value: string
+  enquiry_date: string
+  reference_name: string
+  call_summary: string
   status: LeadStatus
   priority: LeadPriority
   next_followup_at: string
   extra_values: Record<string, string | string[] | boolean>
+}
+
+function todayDateInput() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
 }
 
 function blankForm(projectId = ''): LeadForm {
@@ -98,11 +109,12 @@ function blankForm(projectId = ''): LeadForm {
     full_name: '',
     mobile: '',
     email: '',
-    company_name: '',
     city: '',
     lead_source: '',
     requirement: '',
-    expected_value: '',
+    enquiry_date: todayDateInput(),
+    reference_name: '',
+    call_summary: '',
     status: 'new',
     priority: 'medium',
     next_followup_at: defaultFollowupLocal(),
@@ -170,16 +182,70 @@ export function LeadsPage() {
   const [form, setForm] = useState<LeadForm>(blankForm())
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [projectFields, setProjectFields] = useState<LeadField[]>([])
-  const [listFields, setListFields] = useState<LeadField[]>([])
+  const [fieldsByProject, setFieldsByProject] = useState<Record<string, LeadField[]>>({})
   const [fieldsDrawerOpen, setFieldsDrawerOpen] = useState(false)
   const [manageProjectId, setManageProjectId] = useState('')
   const importInputRef = useRef<HTMLInputElement | null>(null)
+
+  const columnFieldsUnion = useMemo(() => {
+    const map = new Map<string, LeadField>()
+    const source = projectFilter
+      ? (fieldsByProject[projectFilter] ?? [])
+      : Object.values(fieldsByProject).flat()
+    for (const field of source) {
+      if (field.is_active && field.show_as_column && !map.has(field.key)) {
+        map.set(field.key, field)
+      }
+    }
+    return [...map.values()].sort(
+      (a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label),
+    )
+  }, [fieldsByProject, projectFilter])
+
+  const extraColumnDefs = useMemo<ColumnDef[]>(
+    () =>
+      columnFieldsUnion.map((field) => ({
+        key: `extra:${field.key}`,
+        label: field.label,
+        hideable: true,
+        track: '120px',
+      })),
+    [columnFieldsUnion],
+  )
+
+  const {
+    columns: columnDefs,
+    visibility: columnVisibility,
+    isVisible: isColumnVisible,
+    toggle: toggleColumn,
+    reset: resetColumns,
+    gridTemplateMd: leadsGridMd,
+    gridTemplateXs: leadsGridXs,
+    loadError: columnLoadError,
+    saveError: columnSaveError,
+    clearSaveError: clearColumnSaveError,
+    clearLoadError: clearColumnLoadError,
+  } = useColumnVisibility('leads', extraColumnDefs)
 
   useEffect(() => {
     if (!notice) return
     const timer = window.setTimeout(() => setNotice(''), 2200)
     return () => window.clearTimeout(timer)
   }, [notice])
+
+  useEffect(() => {
+    if (columnSaveError) {
+      setError("Couldn't save column preferences on this device. Layout kept; try again.")
+      clearColumnSaveError()
+    }
+  }, [columnSaveError, clearColumnSaveError])
+
+  useEffect(() => {
+    if (columnLoadError) {
+      setError('Column preferences could not be loaded. Showing all columns.')
+      clearColumnLoadError()
+    }
+  }, [columnLoadError, clearColumnLoadError])
 
   const activeFields = useMemo(
     () => projectFields.filter((field) => field.is_active),
@@ -259,32 +325,40 @@ export function LeadsPage() {
     void load()
   }, [load])
 
-  useEffect(() => {
-    void (async () => {
-      if (!projectFilter) {
-        setListFields([])
-        return
-      }
-      const fields = await fetchFields(projectFilter)
-      setListFields(fields.filter((field) => field.is_active && field.show_in_list))
-    })()
-  }, [fetchFields, projectFilter])
+  const loadFieldsForProject = useCallback(
+    async (projectId: string) => {
+      if (!projectId) return
+      const fields = await fetchFields(projectId)
+      setFieldsByProject((current) => ({ ...current, [projectId]: fields }))
+    },
+    [fetchFields],
+  )
 
-  const refreshListFields = useCallback(async () => {
-    if (!projectFilter) {
-      setListFields([])
+  useEffect(() => {
+    if (projectFilter) {
+      void loadFieldsForProject(projectFilter)
       return
     }
-    const fields = await fetchFields(projectFilter)
-    setListFields(fields.filter((field) => field.is_active && field.show_in_list))
-  }, [fetchFields, projectFilter])
+    for (const project of projects) {
+      void loadFieldsForProject(project.id)
+    }
+  }, [loadFieldsForProject, projectFilter, projects])
 
   const refreshFieldsAfterManage = useCallback(async () => {
-    await refreshListFields()
+    if (manageProjectId) {
+      await loadFieldsForProject(manageProjectId)
+    }
     if (form.project_id) {
       await loadProjectFields(form.project_id)
     }
-  }, [form.project_id, loadProjectFields, refreshListFields])
+  }, [form.project_id, loadFieldsForProject, loadProjectFields, manageProjectId])
+
+  function subtitleFieldsForLead(lead: Lead): LeadField[] {
+    if (!lead.project_id) return []
+    return (fieldsByProject[lead.project_id] ?? [])
+      .filter((field) => field.is_active && field.show_in_list && !field.show_as_column)
+      .slice(0, 3)
+  }
 
   function openFieldsDrawer(projectId?: string) {
     const next = projectId || projectFilter || projects[0]?.id || ''
@@ -334,11 +408,12 @@ export function LeadsPage() {
       full_name: lead.full_name,
       mobile: lead.mobile,
       email: lead.email ?? '',
-      company_name: lead.company_name ?? '',
       city: lead.city ?? '',
       lead_source: lead.lead_source ?? '',
       requirement: lead.requirement ?? '',
-      expected_value: lead.expected_value ?? '',
+      enquiry_date: lead.enquiry_date ?? '',
+      reference_name: lead.reference_name ?? '',
+      call_summary: lead.call_summary ?? '',
       status: lead.status,
       priority: lead.priority,
       next_followup_at: lead.next_followup_at
@@ -418,11 +493,12 @@ export function LeadsPage() {
       full_name: form.full_name.trim(),
       mobile: form.mobile.trim(),
       email: form.email.trim() || null,
-      company_name: form.company_name.trim() || null,
       city: form.city.trim() || null,
       lead_source: form.lead_source || null,
       requirement: form.requirement.trim() || null,
-      expected_value: form.expected_value.trim() || null,
+      enquiry_date: form.enquiry_date.trim() || null,
+      reference_name: form.reference_name.trim() || null,
+      call_summary: form.call_summary.trim() || null,
       status: form.status,
       priority: form.priority,
       next_followup_at: localInputToIso(form.next_followup_at),
@@ -595,19 +671,21 @@ export function LeadsPage() {
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField
-            label="Company / organisation"
-            value={form.company_name}
+            label="Enquiry Date"
+            type="date"
+            value={form.enquiry_date}
             fullWidth
             disabled={disabled}
-            onChange={(event) => setForm((current) => ({ ...current, company_name: event.target.value }))}
+            InputLabelProps={{ shrink: true }}
+            onChange={(event) => setForm((current) => ({ ...current, enquiry_date: event.target.value }))}
           />
           <TextField
-            label="Expected value"
-            value={form.expected_value}
+            label="Reference"
+            value={form.reference_name}
             fullWidth
             disabled={disabled}
-            placeholder="Optional"
-            onChange={(event) => setForm((current) => ({ ...current, expected_value: event.target.value }))}
+            placeholder="Who referred them?"
+            onChange={(event) => setForm((current) => ({ ...current, reference_name: event.target.value }))}
           />
         </Stack>
 
@@ -620,6 +698,17 @@ export function LeadsPage() {
           disabled={disabled}
           placeholder="What are they looking for?"
           onChange={(event) => setForm((current) => ({ ...current, requirement: event.target.value }))}
+        />
+
+        <TextField
+          label="Call Summary"
+          value={form.call_summary}
+          fullWidth
+          multiline
+          minRows={2}
+          disabled={disabled}
+          placeholder="Notes from the call"
+          onChange={(event) => setForm((current) => ({ ...current, call_summary: event.target.value }))}
         />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -877,6 +966,12 @@ export function LeadsPage() {
             </>
           ) : null}
         </Stack>
+        <ColumnChooser
+          columns={columnDefs}
+          visibility={columnVisibility}
+          onToggle={toggleColumn}
+          onReset={resetColumns}
+        />
       </Stack>
 
       {isSales && projects.length === 0 ? (
@@ -972,138 +1067,214 @@ export function LeadsPage() {
                 : 'No leads match these filters.'}
           </Typography>
         ) : (
-          <>
-            <Box
-              sx={{
-                display: { xs: 'none', md: 'grid' },
-                gridTemplateColumns: 'minmax(0,1.6fr) 104px 84px 100px 96px 44px',
-                columnGap: 1.25,
-                alignItems: 'center',
-                px: 2,
-                py: 1,
-                bgcolor: '#f8fafc',
-                borderBottom: '1px solid #dbe3ee',
-              }}
-            >
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Lead
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Status
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Priority
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Follow-up
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Source
-              </Typography>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
-                {' '}
-              </Typography>
-            </Box>
-            {items.map((lead) => {
-              const clickable = canUpdate || isOwner
-              const statusTone = STATUS_TONE[lead.status] ?? { bg: '#f1f5f9', color: '#475569' }
-              return (
-                <Box
-                  key={lead.id}
-                  onClick={() => {
-                    if (clickable) void openEdit(lead)
-                  }}
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: {
-                      xs: 'minmax(0,1fr) auto',
-                      md: 'minmax(0,1.6fr) 104px 84px 100px 96px 44px',
-                    },
-                    columnGap: 1.25,
-                    rowGap: 0.75,
-                    alignItems: 'center',
-                    px: 2,
-                    py: 1.15,
-                    borderBottom: '1px solid #edf1f7',
-                    cursor: clickable ? 'pointer' : 'default',
-                    '&:hover': { bgcolor: '#f8fbff' },
-                  }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={700} noWrap>
-                      {lead.full_name}
+          <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
+            <Box sx={{ minWidth: { md: columnFieldsUnion.length > 0 ? 900 : 0 } }}>
+              <Box
+                sx={{
+                  display: { xs: 'none', md: 'grid' },
+                  gridTemplateColumns: leadsGridMd,
+                  columnGap: 1.25,
+                  alignItems: 'center',
+                  px: 2,
+                  py: 1,
+                  bgcolor: '#f8fafc',
+                  borderBottom: '1px solid #dbe3ee',
+                }}
+              >
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  Lead
+                </Typography>
+                {isColumnVisible('project') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Project
+                  </Typography>
+                ) : null}
+                {isColumnVisible('phone') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Phone
+                  </Typography>
+                ) : null}
+                {isColumnVisible('status') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Status
+                  </Typography>
+                ) : null}
+                {isColumnVisible('priority') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Priority
+                  </Typography>
+                ) : null}
+                {isColumnVisible('follow_up') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Follow-up
+                  </Typography>
+                ) : null}
+                {isColumnVisible('source') ? (
+                  <Typography variant="caption" fontWeight={700} color="text.secondary">
+                    Source
+                  </Typography>
+                ) : null}
+                {columnFieldsUnion.map((field) =>
+                  isColumnVisible(`extra:${field.key}`) ? (
+                    <Typography
+                      key={field.id}
+                      variant="caption"
+                      fontWeight={700}
+                      color="text.secondary"
+                      noWrap
+                    >
+                      {field.label}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                      {lead.lead_number}
-                      {lead.project_name ? ` · ${lead.project_name}` : ''}
-                      {lead.city ? ` · ${lead.city}` : ''}
-                      {' · '}
-                      <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                        {lead.mobile}
-                      </Box>
-                    </Typography>
-                    {listFields.length > 0 ? (
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {listFields
-                          .slice(0, 3)
-                          .map((field) => `${field.label}: ${formatExtraDisplay(lead.extra_values?.[field.key])}`)
-                          .join(' · ')}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                  <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
-                    <ToneChip label={STATUS_LABEL[lead.status] ?? lead.status} {...statusTone} />
-                  </Box>
-                  <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
-                    <ToneChip label={PRIORITY_LABEL[lead.priority]} {...PRIORITY_TONE[lead.priority]} />
-                  </Box>
-                  <Stack
-                    direction="row"
-                    spacing={0.5}
+                  ) : null,
+                )}
+                <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
+                  {' '}
+                </Typography>
+              </Box>
+              {items.map((lead) => {
+                const clickable = canUpdate || isOwner
+                const statusTone = STATUS_TONE[lead.status] ?? { bg: '#f1f5f9', color: '#475569' }
+                const leadSubtitleFields = subtitleFieldsForLead(lead)
+                const leadProjectFields = lead.project_id ? (fieldsByProject[lead.project_id] ?? []) : []
+                const leadColumnKeys = new Set(
+                  leadProjectFields.filter((field) => field.is_active && field.show_as_column).map((field) => field.key),
+                )
+                return (
+                  <Box
+                    key={lead.id}
+                    onClick={() => {
+                      if (clickable) void openEdit(lead)
+                    }}
                     sx={{
+                      display: 'grid',
+                      gridTemplateColumns: {
+                        xs: leadsGridXs,
+                        md: leadsGridMd,
+                      },
+                      columnGap: 1.25,
+                      rowGap: 0.75,
                       alignItems: 'center',
-                      gridColumn: { xs: '1', md: 'auto' },
-                      fontSize: 13,
-                      color: 'text.secondary',
-                      whiteSpace: 'nowrap',
+                      px: 2,
+                      py: 1.15,
+                      borderBottom: '1px solid #edf1f7',
+                      cursor: clickable ? 'pointer' : 'default',
+                      '&:hover': { bgcolor: '#f8fbff' },
                     }}
                   >
-                    <TodayOutlinedIcon sx={{ fontSize: 15 }} />
-                    {formatDueLabel(lead.next_followup_at)}
-                  </Stack>
-                  <Typography
-                    variant="body2"
-                    noWrap
-                    sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
-                  >
-                    {lead.lead_source || '—'}
-                  </Typography>
-                  <Stack
-                    direction="row"
-                    onClick={(event) => event.stopPropagation()}
-                    sx={{ justifyContent: 'flex-end', gridColumn: { xs: '2', md: 'auto' }, gridRow: { xs: '1', md: 'auto' } }}
-                  >
-                    <Tooltip title="Open">
-                      <IconButton
-                        size="small"
-                        aria-label={`Open ${lead.full_name}`}
-                        onClick={() => void openEdit(lead)}
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={700} noWrap>
+                        {lead.full_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap display="block">
+                        {lead.lead_number}
+                        {lead.city ? ` · ${lead.city}` : ''}
+                      </Typography>
+                      {leadSubtitleFields.length > 0 ? (
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                          {leadSubtitleFields
+                            .map((field) => `${field.label}: ${formatExtraDisplay(lead.extra_values?.[field.key])}`)
+                            .join(' · ')}
+                        </Typography>
+                      ) : null}
+                    </Box>
+                    {isColumnVisible('project') ? (
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
+                      >
+                        {lead.project_name || '—'}
+                      </Typography>
+                    ) : null}
+                    {isColumnVisible('phone') ? (
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'primary.main', fontWeight: 600 }}
+                      >
+                        {lead.mobile || '—'}
+                      </Typography>
+                    ) : null}
+                    {isColumnVisible('status') ? (
+                      <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
+                        <ToneChip label={STATUS_LABEL[lead.status] ?? lead.status} {...statusTone} />
+                      </Box>
+                    ) : null}
+                    {isColumnVisible('priority') ? (
+                      <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
+                        <ToneChip label={PRIORITY_LABEL[lead.priority]} {...PRIORITY_TONE[lead.priority]} />
+                      </Box>
+                    ) : null}
+                    {isColumnVisible('follow_up') ? (
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
                         sx={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: '8px',
+                          alignItems: 'center',
+                          gridColumn: { xs: '1', md: 'auto' },
+                          fontSize: 13,
                           color: 'text.secondary',
-                          '&:hover': { bgcolor: '#eef2f7', color: 'text.primary' },
+                          whiteSpace: 'nowrap',
                         }}
                       >
-                        <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
-                </Box>
-              )
-            })}
-          </>
+                        <TodayOutlinedIcon sx={{ fontSize: 15 }} />
+                        {formatDueLabel(lead.next_followup_at)}
+                      </Stack>
+                    ) : null}
+                    {isColumnVisible('source') ? (
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
+                      >
+                        {lead.lead_source || '—'}
+                      </Typography>
+                    ) : null}
+                    {columnFieldsUnion.map((field) =>
+                      isColumnVisible(`extra:${field.key}`) ? (
+                        <Typography
+                          key={field.id}
+                          variant="body2"
+                          noWrap
+                          sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
+                        >
+                          {leadColumnKeys.has(field.key)
+                            ? formatExtraDisplay(lead.extra_values?.[field.key])
+                            : '—'}
+                        </Typography>
+                      ) : null,
+                    )}
+                    <Stack
+                      direction="row"
+                      onClick={(event) => event.stopPropagation()}
+                      sx={{
+                        justifyContent: 'flex-end',
+                        gridColumn: { xs: '2', md: 'auto' },
+                        gridRow: { xs: '1', md: 'auto' },
+                      }}
+                    >
+                      <Tooltip title="Open">
+                        <IconButton
+                          size="small"
+                          aria-label={`Open ${lead.full_name}`}
+                          onClick={() => void openEdit(lead)}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: '8px',
+                            color: 'text.secondary',
+                            '&:hover': { bgcolor: '#eef2f7', color: 'text.primary' },
+                          }}
+                        >
+                          <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
         )}
       </Box>
 
@@ -1362,7 +1533,7 @@ export function LeadsPage() {
         onClose={closeFieldsDrawer}
         PaperProps={{
           sx: {
-            width: { xs: '100%', sm: 520, md: 640 },
+            width: { xs: '100%', sm: 560, md: 720 },
             p: 2,
             boxSizing: 'border-box',
           },
@@ -1378,7 +1549,8 @@ export function LeadsPage() {
             </IconButton>
           </Stack>
           <Typography variant="body2" color="text.secondary">
-            Extra columns for one project. They show on Create lead, Import, and the lead list when marked In list.
+            Active fields show on Create/Edit and Import. In list shows under the lead name (first 3). Separate column
+            adds a real table column you can also toggle in the column chooser.
           </Typography>
           <LeadFieldsManager
             projectId={manageProjectId}

@@ -62,6 +62,7 @@ class LeadField(Base):
     options: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     show_in_list: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    show_as_column: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(

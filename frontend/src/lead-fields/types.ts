@@ -37,6 +37,7 @@ export interface LeadField {
   options: string[] | null
   is_required: boolean
   show_in_list: boolean
+  show_as_column: boolean
   is_active: boolean
   sort_order: number
   leads_with_data: number
