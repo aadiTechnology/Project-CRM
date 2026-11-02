@@ -47,14 +47,32 @@ async function refreshSession(): Promise<RefreshResult> {
         if (csrfToken) {
           headers['X-CSRF-Token'] = csrfToken
         }
-        const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+        let response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
           headers,
         })
+        // Backend mid-reload can fail CSRF once — refresh token and retry once.
+        if (response.status === 403) {
+          const error = await toApiError(response)
+          if (error.code === 'CSRF_VALIDATION_FAILED') {
+            csrfToken = null
+            await ensureCsrf()
+            const retryHeaders: Record<string, string> = { Accept: 'application/json' }
+            if (csrfToken) retryHeaders['X-CSRF-Token'] = csrfToken
+            response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: retryHeaders,
+            })
+          } else {
+            // Not a real logout — treat as brief outage (uvicorn reload).
+            return 'network'
+          }
+        }
         if (response.ok) return 'ok'
-        // Only treat real auth failures as logout. Backend reloads / blips are network.
-        if (response.status === 401 || response.status === 403) return 'unauthorized'
+        // Only a true 401 means the session is gone.
+        if (response.status === 401) return 'unauthorized'
         return 'network'
       } catch {
         return 'network'

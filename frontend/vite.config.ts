@@ -7,6 +7,10 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    watch: {
+      // Avoid random full reloads from unrelated folders / antivirus file touches.
+      ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/coverage/**'],
+    },
   },
   test: {
     environment: 'jsdom',
