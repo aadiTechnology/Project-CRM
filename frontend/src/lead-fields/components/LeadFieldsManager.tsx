@@ -46,6 +46,7 @@ type FieldForm = {
   optionsText: string
   is_required: boolean
   show_in_list: boolean
+  show_as_column: boolean
   is_active: boolean
 }
 
@@ -71,6 +72,7 @@ function blankForm(): FieldForm {
     optionsText: '',
     is_required: false,
     show_in_list: true,
+    show_as_column: false,
     is_active: true,
   }
 }
@@ -82,6 +84,7 @@ function formFromField(field: LeadField): FieldForm {
     optionsText: (field.options ?? []).join('\n'),
     is_required: field.is_required,
     show_in_list: field.show_in_list,
+    show_as_column: Boolean(field.show_as_column),
     is_active: field.is_active,
   }
 }
@@ -185,6 +188,7 @@ export function LeadFieldsManager({
       options: needsOptions ? parseOptions(form.optionsText) : null,
       is_required: form.is_required,
       show_in_list: form.show_in_list,
+      show_as_column: form.show_as_column,
       is_active: form.is_active,
     }
     try {
@@ -213,7 +217,11 @@ export function LeadFieldsManager({
     }
   }
 
-  async function toggleFlag(field: LeadField, key: 'is_required' | 'show_in_list' | 'is_active', value: boolean) {
+  async function toggleFlag(
+    field: LeadField,
+    key: 'is_required' | 'show_in_list' | 'show_as_column' | 'is_active',
+    value: boolean,
+  ) {
     setSaving(true)
     setError('')
     try {
@@ -427,28 +435,39 @@ export function LeadFieldsManager({
                   }
                   label="Required"
                 />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={field.show_in_list}
-                      disabled={saving}
-                      onChange={(event) => void toggleFlag(field, 'show_in_list', event.target.checked)}
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={field.show_in_list}
+                          disabled={saving}
+                          onChange={(event) => void toggleFlag(field, 'show_in_list', event.target.checked)}
+                        />
+                      }
+                      label="In list"
                     />
-                  }
-                  label="In list"
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={field.is_active}
-                      disabled={saving}
-                      onChange={(event) => void toggleFlag(field, 'is_active', event.target.checked)}
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={Boolean(field.show_as_column)}
+                          disabled={saving}
+                          onChange={(event) => void toggleFlag(field, 'show_as_column', event.target.checked)}
+                        />
+                      }
+                      label="Column"
                     />
-                  }
-                  label="Active"
-                />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={field.is_active}
+                          disabled={saving}
+                          onChange={(event) => void toggleFlag(field, 'is_active', event.target.checked)}
+                        />
+                      }
+                      label="Active"
+                    />
               </Stack>
             </Box>
           ))}
@@ -469,10 +488,12 @@ export function LeadFieldsManager({
               Extra fields ({data.items.length})
             </Typography>
           </Box>
+          <Box sx={{ overflowX: 'auto' }}>
           <Table
             size="small"
             sx={{
               width: '100%',
+              minWidth: 640,
               tableLayout: 'fixed',
               '& th, & td': {
                 borderBottomColor: '#edf1f7',
@@ -490,19 +511,22 @@ export function LeadFieldsManager({
           >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ width: 88 }}>Order</TableCell>
-                <TableCell sx={{ width: '32%' }}>Field</TableCell>
-                <TableCell sx={{ width: '12%' }}>Type</TableCell>
-                <TableCell align="center" sx={{ width: '12%' }}>
+                <TableCell sx={{ width: 72 }}>Order</TableCell>
+                <TableCell sx={{ width: '26%' }}>Field</TableCell>
+                <TableCell sx={{ width: '10%' }}>Type</TableCell>
+                <TableCell align="center" sx={{ width: '10%' }}>
                   Required
                 </TableCell>
-                <TableCell align="center" sx={{ width: '12%' }}>
+                <TableCell align="center" sx={{ width: '10%' }}>
                   In list
                 </TableCell>
-                <TableCell align="center" sx={{ width: '12%' }}>
+                <TableCell align="center" sx={{ width: '10%' }}>
+                  Column
+                </TableCell>
+                <TableCell align="center" sx={{ width: '10%' }}>
                   Active
                 </TableCell>
-                <TableCell align="right" sx={{ width: 96 }}>
+                <TableCell align="right" sx={{ width: 88 }}>
                   Actions
                 </TableCell>
               </TableRow>
@@ -580,6 +604,15 @@ export function LeadFieldsManager({
                   <TableCell align="center">
                     <Checkbox
                       size="small"
+                      checked={Boolean(field.show_as_column)}
+                      disabled={saving}
+                      inputProps={{ 'aria-label': `Separate column for ${field.label}` }}
+                      onChange={(event) => void toggleFlag(field, 'show_as_column', event.target.checked)}
+                    />
+                  </TableCell>
+                  <TableCell align="center">
+                    <Checkbox
+                      size="small"
                       checked={field.is_active}
                       disabled={saving}
                       inputProps={{ 'aria-label': `Active for ${field.label}` }}
@@ -621,6 +654,7 @@ export function LeadFieldsManager({
               ))}
             </TableBody>
           </Table>
+          </Box>
         </Box>
       )}
 
@@ -687,7 +721,17 @@ export function LeadFieldsManager({
                     onChange={(event) => setForm((current) => ({ ...current, show_in_list: event.target.checked }))}
                   />
                 }
-                label="Lead table — show as a column in the lead table"
+                label="In list — show under the lead name on the Leads screen"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={form.show_as_column}
+                    disabled={saving}
+                    onChange={(event) => setForm((current) => ({ ...current, show_as_column: event.target.checked }))}
+                  />
+                }
+                label="Separate column — own column on the Leads table"
               />
               <FormControlLabel
                 control={

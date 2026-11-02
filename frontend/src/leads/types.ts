@@ -25,6 +25,9 @@ export interface Lead {
   address: string | null
   requirement: string | null
   expected_value: string | null
+  enquiry_date: string | null
+  reference_name: string | null
+  call_summary: string | null
   lead_source: string | null
   owner_id: string
   created_by_id: string

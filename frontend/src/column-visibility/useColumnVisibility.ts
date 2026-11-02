@@ -2,17 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../store/auth-context'
 import {
+  ColumnDef,
   ColumnScreen,
   SCREEN_COLUMNS,
-  buildGridTemplate,
+  buildGridTemplateFromColumns,
   getDefaultVisibility,
+  mergeLeadsColumns,
 } from './definitions'
 import { loadColumnVisibility, resetColumnVisibility, saveColumnVisibility } from './storage'
 
-export function useColumnVisibility(screen: ColumnScreen) {
+export function useColumnVisibility(screen: ColumnScreen, extraColumns: readonly ColumnDef[] = []) {
   const { user } = useAuth()
   const userId = user?.id
-  const columns = SCREEN_COLUMNS[screen]
+
+  const columns = useMemo(() => {
+    if (screen === 'leads') return mergeLeadsColumns(extraColumns)
+    if (!extraColumns.length) return SCREEN_COLUMNS[screen]
+    return [...SCREEN_COLUMNS[screen], ...extraColumns]
+  }, [extraColumns, screen])
 
   const [visibility, setVisibility] = useState<Record<string, boolean>>(() => getDefaultVisibility(screen))
   const [loadError, setLoadError] = useState(false)
@@ -49,16 +56,24 @@ export function useColumnVisibility(screen: ColumnScreen) {
 
   const reset = useCallback(() => {
     const result = resetColumnVisibility(userId, screen)
-    setVisibility(result.visibility)
+    const next = { ...result.visibility }
+    for (const col of extraColumns) {
+      next[col.key] = true
+    }
+    setVisibility(next)
+    if (extraColumns.length) persist(next)
     setSaveError(!result.ok && Boolean(userId))
-  }, [userId, screen])
+  }, [extraColumns, persist, screen, userId])
 
   const clearSaveError = useCallback(() => setSaveError(false), [])
   const clearLoadError = useCallback(() => setLoadError(false), [])
 
   const isVisible = useCallback((key: string) => visibility[key] !== false, [visibility])
 
-  const gridTemplateMd = useMemo(() => buildGridTemplate(screen, visibility), [screen, visibility])
+  const gridTemplateMd = useMemo(
+    () => buildGridTemplateFromColumns(columns, visibility),
+    [columns, visibility],
+  )
 
   /** Phone layouts that keep only locked + lead tracks. */
   const gridTemplateXs = useMemo(() => {

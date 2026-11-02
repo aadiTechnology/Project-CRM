@@ -12,6 +12,10 @@ export function storageKey(userId: string, screen: ColumnScreen) {
   return `${STORAGE_PREFIX}.${userId}.${screen}`
 }
 
+function isExtraColumnKey(key: string) {
+  return key.startsWith('extra:')
+}
+
 function coerceVisibility(screen: ColumnScreen, raw: Record<string, boolean> | undefined): Record<string, boolean> {
   const defaults = getDefaultVisibility(screen)
   const next = { ...defaults }
@@ -19,6 +23,10 @@ function coerceVisibility(screen: ColumnScreen, raw: Record<string, boolean> | u
 
   if (raw && typeof raw === 'object') {
     for (const [key, value] of Object.entries(raw)) {
+      if (isExtraColumnKey(key)) {
+        next[key] = Boolean(value)
+        continue
+      }
       if (!allowed.has(key)) continue
       const def = SCREEN_COLUMNS[screen].find((col) => col.key === key)
       if (!def) continue
@@ -68,6 +76,10 @@ export function saveColumnVisibility(
     for (const col of SCREEN_COLUMNS[screen]) {
       if (!col.hideable) continue
       columns[col.key] = coerced[col.key] !== false
+    }
+    for (const [key, value] of Object.entries(visibility)) {
+      if (!isExtraColumnKey(key)) continue
+      columns[key] = value !== false
     }
     const payload: StoredPayload = { v: STORAGE_VERSION, columns }
     localStorage.setItem(storageKey(userId, screen), JSON.stringify(payload))

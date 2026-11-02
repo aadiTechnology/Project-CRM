@@ -57,6 +57,7 @@ class CreateLeadFieldRequest(BaseModel):
     options: list[str] | None = None
     is_required: bool = False
     show_in_list: bool = True
+    show_as_column: bool = False
     is_active: bool = True
 
     @field_validator("label")
@@ -100,6 +101,7 @@ class UpdateLeadFieldRequest(BaseModel):
     options: list[str] | None = None
     is_required: bool | None = None
     show_in_list: bool | None = None
+    show_as_column: bool | None = None
     is_active: bool | None = None
 
     @field_validator("label")
@@ -145,6 +147,7 @@ class LeadFieldPublic(BaseModel):
     options: list[str] | None
     is_required: bool
     show_in_list: bool
+    show_as_column: bool
     is_active: bool
     sort_order: int
     leads_with_data: int
@@ -185,6 +188,7 @@ def to_lead_field_public(field: LeadField, leads_with_data: int = 0) -> LeadFiel
         options=options,
         is_required=field.is_required,
         show_in_list=field.show_in_list,
+        show_as_column=field.show_as_column,
         is_active=field.is_active,
         sort_order=field.sort_order,
         leads_with_data=leads_with_data,

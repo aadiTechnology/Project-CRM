@@ -1,7 +1,7 @@
 """Lead request and response schemas."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -76,6 +76,9 @@ class CreateLeadRequest(BaseModel):
     address: str | None = Field(default=None, max_length=4000)
     requirement: str | None = Field(default=None, max_length=4000)
     expected_value: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
+    enquiry_date: date | None = None
+    reference_name: str | None = Field(default=None, max_length=120)
+    call_summary: str | None = Field(default=None, max_length=4000)
     lead_source: str | None = Field(default=None, max_length=80)
     owner_id: uuid.UUID | None = None
     company_id: uuid.UUID | None = None
@@ -102,14 +105,14 @@ class CreateLeadRequest(BaseModel):
             return cleaned or None
         return value
 
-    @field_validator("company_name", "city", "lead_source")
+    @field_validator("company_name", "city", "lead_source", "reference_name")
     @classmethod
     def clean_short_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return _optional_text(_collapse(value))
 
-    @field_validator("address", "requirement", "alternate_mobile", "mobile")
+    @field_validator("address", "requirement", "alternate_mobile", "mobile", "call_summary")
     @classmethod
     def clean_free_text(cls, value: str | None) -> str | None:
         return _optional_text(value)
@@ -129,6 +132,9 @@ class UpdateLeadRequest(BaseModel):
     address: str | None = Field(default=None, max_length=4000)
     requirement: str | None = Field(default=None, max_length=4000)
     expected_value: Decimal | None = Field(default=None, ge=0, max_digits=15, decimal_places=2)
+    enquiry_date: date | None = None
+    reference_name: str | None = Field(default=None, max_length=120)
+    call_summary: str | None = Field(default=None, max_length=4000)
     lead_source: str | None = Field(default=None, max_length=80)
     owner_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
@@ -158,14 +164,14 @@ class UpdateLeadRequest(BaseModel):
             return cleaned or None
         return value
 
-    @field_validator("company_name", "city", "lead_source")
+    @field_validator("company_name", "city", "lead_source", "reference_name")
     @classmethod
     def clean_short_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         return _optional_text(_collapse(value))
 
-    @field_validator("address", "requirement", "alternate_mobile", "mobile")
+    @field_validator("address", "requirement", "alternate_mobile", "mobile", "call_summary")
     @classmethod
     def clean_free_text(cls, value: str | None) -> str | None:
         return _optional_text(value)
@@ -186,6 +192,9 @@ class LeadPublic(BaseModel):
     address: str | None
     requirement: str | None
     expected_value: str | None
+    enquiry_date: date | None
+    reference_name: str | None
+    call_summary: str | None
     lead_source: str | None
     owner_id: str
     created_by_id: str
@@ -247,6 +256,9 @@ def to_lead_public(lead: Lead, project_name: str | None = None) -> LeadPublic:
         address=lead.address,
         requirement=lead.requirement,
         expected_value=expected,
+        enquiry_date=lead.enquiry_date,
+        reference_name=lead.reference_name,
+        call_summary=lead.call_summary,
         lead_source=lead.lead_source,
         owner_id=str(lead.owner_id),
         created_by_id=str(lead.created_by_id),

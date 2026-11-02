@@ -49,9 +49,25 @@ export function getDefaultVisibility(screen: ColumnScreen): Record<string, boole
   return out
 }
 
-export function buildGridTemplate(screen: ColumnScreen, visibility: Record<string, boolean>): string {
-  return SCREEN_COLUMNS[screen]
+export function buildGridTemplateFromColumns(
+  columns: readonly ColumnDef[],
+  visibility: Record<string, boolean>,
+): string {
+  return columns
     .filter((col) => visibility[col.key] !== false)
     .map((col) => col.track)
     .join(' ')
+}
+
+export function buildGridTemplate(screen: ColumnScreen, visibility: Record<string, boolean>): string {
+  return buildGridTemplateFromColumns(SCREEN_COLUMNS[screen], visibility)
+}
+
+/** Insert custom lead-field columns before the locked Open action column. */
+export function mergeLeadsColumns(extraColumns: readonly ColumnDef[]): ColumnDef[] {
+  const base = SCREEN_COLUMNS.leads
+  if (!extraColumns.length) return [...base]
+  const open = base.find((col) => col.key === 'open')
+  const rest = base.filter((col) => col.key !== 'open')
+  return open ? [...rest, ...extraColumns, open] : [...rest, ...extraColumns]
 }
