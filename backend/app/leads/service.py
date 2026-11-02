@@ -148,13 +148,17 @@ def _next_lead_number(db: Session, project: Project | None = None) -> str:
     if project is None:
         number = db.execute(text("SELECT nextval('lead_number_seq')")).scalar_one()
         return f"LEAD-{int(number):06d}"
-    count = int(
-        db.scalar(
-            select(func.count()).select_from(Lead).where(Lead.project_id == project.id, Lead.is_deleted.is_(False))
-        )
-        or 0
-    )
-    return f"{project.code}-{count + 1:04d}"
+    # Include soft-deleted rows so we never reuse a lead_number (unique per company).
+    prefix = f"{project.code}-"
+    existing = db.scalars(select(Lead.lead_number).where(Lead.project_id == project.id)).all()
+    max_n = 0
+    for number in existing:
+        if not number.startswith(prefix):
+            continue
+        suffix = number[len(prefix) :]
+        if suffix.isdigit():
+            max_n = max(max_n, int(suffix))
+    return f"{project.code}-{max_n + 1:04d}"
 
 
 def _role_names(user: User) -> set[str]:
@@ -339,8 +343,15 @@ def create_lead(
     db.add(lead)
     try:
         db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
+        detail = str(getattr(exc, "orig", exc))
+        if "uq_leads_company_lead_number" in detail or "lead_number" in detail.lower():
+            raise AppError(
+                ErrorCode.CONFLICT,
+                "Lead number conflict — retry import. If it keeps failing, contact support.",
+                409,
+            ) from None
         raise AppError(ErrorCode.CONFLICT, "Lead could not be saved.", 409) from None
     record_audit(
         db,

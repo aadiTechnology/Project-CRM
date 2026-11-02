@@ -300,9 +300,6 @@ export function BusinessesPage() {
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Typography variant="h1">Businesses</Typography>
-          <Typography color="text.secondary">
-            Capture the organisation like a sales account: contact, city, industry, GST, then add owners and projects.
-          </Typography>
         </Stack>
         {data?.can_manage ? (
           <Button variant="contained" onClick={openCreate} sx={{ flexShrink: 0 }}>

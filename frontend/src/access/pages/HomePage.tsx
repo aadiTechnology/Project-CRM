@@ -5,15 +5,13 @@ import { Link } from 'react-router-dom'
 
 import { roleLabel } from '../role-label'
 import { useAuth } from '../../store/auth-context'
-import { primaryRole, visibleNav } from '../../layouts/AppLayout/nav'
+import { visibleNav } from '../../layouts/AppLayout/nav'
 
 export function HomePage() {
   const { t } = useTranslation(['navigation', 'access'])
   const { user } = useAuth()
   const roles = user?.roles ?? []
   const items = visibleNav(roles, user?.permissions ?? []).filter((item) => item.id !== 'home')
-  const leadRole = primaryRole(roles)
-  const introKey = leadRole ? `roleIntro.${leadRole}` : 'roleIntro.default'
   const readyCount = items.filter((item) => item.ready).length
 
   return (
@@ -66,9 +64,6 @@ export function HomePage() {
           </Typography>
           <Typography variant="h1">
             {t('navigation:homeGreeting', { name: user?.full_name ?? '' })}
-          </Typography>
-          <Typography color="text.secondary" sx={{ fontSize: { xs: '0.95rem', sm: '1.02rem' }, lineHeight: 1.65 }}>
-            {t(introKey, { defaultValue: t('navigation:roleIntro.default') })}
           </Typography>
           <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', pt: 0.25 }}>
             {roles.map((role) => (

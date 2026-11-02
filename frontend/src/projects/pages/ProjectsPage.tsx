@@ -144,14 +144,9 @@ export function ProjectsPage() {
         spacing={2}
         sx={{ alignItems: { xs: 'stretch', sm: 'flex-start' }, justifyContent: 'space-between' }}
       >
-        <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-          <Typography variant="h1">Projects</Typography>
-          <Typography color="text.secondary">
-            {data?.can_create
-              ? 'Create a project under a business. Owners of that business are assigned automatically — fine-tune on Team.'
-              : 'Projects assigned to you. Create leads under these projects from the Leads page.'}
-          </Typography>
-        </Stack>
+        <Typography variant="h1" sx={{ minWidth: 0 }}>
+          Projects
+        </Typography>
         {data?.can_create ? (
           <Button variant="contained" onClick={() => setOpen(true)} sx={{ flexShrink: 0 }}>
             Create project

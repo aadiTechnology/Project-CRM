@@ -271,7 +271,6 @@ export function UsersPage() {
       >
         <Stack spacing={0.75} sx={{ minWidth: 0 }}>
           <Typography variant="h1">{t('access:usersTitle')}</Typography>
-          <Typography color="text.secondary">{t('access:usersDescription')}</Typography>
         </Stack>
         {data?.can_create ? (
           <Button variant="contained" onClick={() => setCreateOpen(true)} sx={{ flexShrink: 0 }}>
@@ -346,7 +345,14 @@ export function UsersPage() {
       {filtered.length === 0 ? <Typography color="text.secondary">{t('access:noUsers')}</Typography> : null}
 
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px', bgcolor: '#fff', overflow: 'hidden' }}>
-        <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }}>
+        <Table
+          size="small"
+          sx={{
+            tableLayout: 'fixed',
+            width: '100%',
+            '& .MuiTableCell-root': { borderBottom: 'none' },
+          }}
+        >
           <TableHead>
             <TableRow sx={{ bgcolor: '#f8fafc' }}>
               <TableCell sx={{ fontWeight: 700, width: '28%' }}>{t('access:name')}</TableCell>
@@ -363,7 +369,7 @@ export function UsersPage() {
               const isSelf = account.id === user?.id
               const primaryRole = account.roles[0] ?? ''
               return (
-                <TableRow key={account.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                <TableRow key={account.id} hover>
                   <TableCell sx={{ maxWidth: 0 }}>
                     <Typography fontWeight={700} noWrap>
                       {account.full_name}

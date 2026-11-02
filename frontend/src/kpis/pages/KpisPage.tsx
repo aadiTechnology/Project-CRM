@@ -97,12 +97,9 @@ export function KpisPage() {
         spacing={2}
         sx={{ alignItems: { sm: 'flex-start' }, justifyContent: 'space-between' }}
       >
-        <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-          <Typography variant="h1">KPIs Overview</Typography>
-          <Typography color="text.secondary" sx={{ maxWidth: 640, lineHeight: 1.55 }}>
-            Live snapshot of your visible leads. Filter by project, then open a card to jump to related work.
-          </Typography>
-        </Stack>
+        <Typography variant="h1" sx={{ minWidth: 0 }}>
+          KPIs Overview
+        </Typography>
         <TextField
           select
           size="small"

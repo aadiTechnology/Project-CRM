@@ -28,7 +28,6 @@ import {
   gapForStep,
   loadFollowupPlan,
   nextPlanStep,
-  planLabels,
 } from '../../followup-plan/plan'
 import { addDaysIso, followWhen, formatDueLabel } from '../../leads/lead-dates'
 import {
@@ -94,7 +93,6 @@ export function FollowUpsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [projectId, setProjectId] = useState('')
-  const [step, setStep] = useState('')
   const [saving, setSaving] = useState(false)
   const [tally, setTally] = useState<SessionTally>({ connected: 0, noAnswer: 0, snoozed: 0, skipped: 0 })
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
@@ -139,7 +137,6 @@ export function FollowUpsPage() {
     try {
       const params = new URLSearchParams({ limit: '200', exclude_lost: 'true' })
       if (projectId) params.set('project_id', projectId)
-      if (step) params.set('plan_step', step)
       const result = await api.get<LeadList>(`/api/v1/leads?${params}`)
       const rows = [...result.data.items].sort((a, b) => {
         const aDue = a.next_followup_at ?? '9999'
@@ -152,7 +149,7 @@ export function FollowUpsPage() {
     } finally {
       setLoading(false)
     }
-  }, [projectId, step])
+  }, [projectId])
 
   useEffect(() => {
     setLoading(true)
@@ -251,27 +248,12 @@ export function FollowUpsPage() {
           label="Project"
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
-          sx={{ minWidth: { xs: '100%', sm: 260 } }}
+          sx={{ minWidth: { xs: '100%', sm: 220 } }}
         >
           <MenuItem value="">All projects</MenuItem>
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
               {project.name}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Plan step"
-          value={step}
-          onChange={(event) => setStep(event.target.value)}
-          sx={{ minWidth: { xs: '100%', sm: 260 } }}
-        >
-          <MenuItem value="">All steps</MenuItem>
-          {planLabels(plan).map((item) => (
-            <MenuItem key={item} value={item}>
-              {item}
             </MenuItem>
           ))}
         </TextField>
@@ -344,7 +326,7 @@ export function FollowUpsPage() {
 
         {items.length === 0 ? (
           <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-            {step ? `No follow-ups for ${step}.` : 'No open follow-ups in your scope.'}
+            No open follow-ups in your scope.
           </Typography>
         ) : (
           items.map((lead) => {
