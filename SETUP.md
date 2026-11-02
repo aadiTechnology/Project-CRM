@@ -167,7 +167,7 @@ Owner usually configures **Lead Fields** first. Full PRD items like a separate d
 ### Before import
 
 1. Login (owner or salesperson assigned to the project).  
-2. Open **Lead Fields** → select project (e.g. **Paneerwala**).  
+2. Open **Leads** → **Manage fields** (tune icon) → select project (e.g. **Paneerwala**).  
 3. Add / check fields that match your Excel headers (Product, Quantity, Payment, Call time, Follow-up notes, etc.).  
 4. Prepare an `.xlsx` file:
    - Row 1 = column headers  
@@ -213,6 +213,6 @@ How mapping works:
 - [ ] Frontend `npm install` + `.env` pointing at API  
 - [ ] Frontend on http://127.0.0.1:5173  
 - [ ] Can login with a demo account  
-- [ ] (Optional) Lead Fields set → Excel import on Leads  
+- [ ] (Optional) Manage fields on Leads → Excel import  
 
 Do **not** commit `.env` files, passwords, or Excel sample dumps unless your team explicitly wants them in git.

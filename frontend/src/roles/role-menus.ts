@@ -3,7 +3,7 @@
 export type WorksLike = 'SALESPERSON' | 'MARKETING'
 
 export const WORKS_LIKE_MENUS: Record<WorksLike, string[]> = {
-  SALESPERSON: ['Reminders', 'Leads', 'Lead Fields', 'Pipeline', 'Follow-ups', 'KPIs'],
+  SALESPERSON: ['Reminders', 'Leads', 'Pipeline', 'Follow-ups', 'KPIs'],
   MARKETING: ['Campaigns'],
 }
 
@@ -20,7 +20,6 @@ export const MATRIX_COLUMNS = [
   'Team',
   'Campaigns',
   'Leads',
-  'Lead Fields',
   'Pipeline',
   'Reminders',
   'Follow-ups',
@@ -36,16 +35,15 @@ export type MatrixColumn = (typeof MATRIX_COLUMNS)[number]
 /** Fixed menus for the four product roles. */
 export const SYSTEM_ROLE_MENUS: Record<string, string[]> = {
   SUPER_ADMIN: ['Businesses', 'Plans', 'Projects', 'Users', 'Roles', 'Team'],
-  BUSINESS_OWNER: ['Home', 'Projects', 'Team', 'Leads', 'Lead Fields', 'Pipeline', 'Follow-ups', 'KPIs'],
+  BUSINESS_OWNER: ['Home', 'Projects', 'Team', 'Leads', 'Pipeline', 'Follow-ups', 'KPIs'],
   MARKETING: ['Campaigns'],
-  SALESPERSON: ['Projects', 'Reminders', 'Leads', 'Lead Fields', 'Pipeline', 'Follow-ups', 'KPIs'],
+  SALESPERSON: ['Projects', 'Reminders', 'Leads', 'Pipeline', 'Follow-ups', 'KPIs'],
 }
 
 /** Map a friendly menu tick to API permission keys when creating a custom role. */
 export const MENU_TO_PERMISSIONS: Record<string, string[]> = {
   Reminders: ['features.read'],
   Leads: ['features.read', 'leads.read', 'leads.create', 'leads.update'],
-  'Lead Fields': ['features.read', 'leads.read'],
   Pipeline: ['features.read', 'leads.read', 'leads.update'],
   'Follow-ups': ['features.read'],
   KPIs: ['features.read'],
@@ -56,7 +54,6 @@ export function menusFromPermissions(keys: readonly string[]): string[] {
   const set = new Set(keys)
   const menus: string[] = []
   if (set.has('leads.create') || set.has('leads.read')) menus.push('Leads')
-  if (set.has('leads.read')) menus.push('Lead Fields')
   if (set.has('leads.read') && set.has('leads.update')) menus.push('Pipeline')
   if (set.has('leads.read')) {
     for (const menu of ['Reminders', 'Follow-ups', 'KPIs']) menus.push(menu)
