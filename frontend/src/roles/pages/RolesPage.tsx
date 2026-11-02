@@ -147,9 +147,6 @@ export function RolesPage() {
     <Stack spacing={2.5}>
       <Stack spacing={0.75}>
         <Typography variant="h1">{t('access:rolesTitle')}</Typography>
-        <Typography color="text.secondary">
-          {canCreate ? t('access:rolesDescriptionAdmin') : t('access:rolesDescriptionRead')}
-        </Typography>
       </Stack>
 
       {notice ? <Alert severity="success">{notice}</Alert> : null}
@@ -242,7 +239,13 @@ export function RolesPage() {
           bgcolor: '#fff',
         }}
       >
-        <Table size="small" sx={{ minWidth: 1100 }}>
+        <Table
+          size="small"
+          sx={{
+            minWidth: 1100,
+            '& .MuiTableCell-root': { borderBottom: 'none' },
+          }}
+        >
           <TableHead>
             <TableRow sx={{ bgcolor: '#f8fafc' }}>
               <TableCell sx={{ fontWeight: 600, position: 'sticky', left: 0, bgcolor: '#f8fafc', zIndex: 1 }}>
@@ -257,7 +260,7 @@ export function RolesPage() {
           </TableHead>
           <TableBody>
             {rows.map(({ role, menus: roleMenuList }) => (
-              <TableRow key={role.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+              <TableRow key={role.id} hover>
                 <TableCell
                   sx={{
                     position: 'sticky',

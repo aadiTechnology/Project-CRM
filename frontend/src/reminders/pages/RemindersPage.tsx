@@ -464,12 +464,19 @@ export function RemindersPage() {
         }}
       >
         <TextField
+          size="small"
           label="Search"
           placeholder="Search reminder, lead, mobile"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <TextField select label="Project" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+        <TextField
+          select
+          size="small"
+          label="Project"
+          value={projectId}
+          onChange={(event) => setProjectId(event.target.value)}
+        >
           <MenuItem value="">All projects</MenuItem>
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
@@ -479,6 +486,7 @@ export function RemindersPage() {
         </TextField>
         <TextField
           select
+          size="small"
           label="When"
           value={when}
           onChange={(event) => setWhen(event.target.value as WhenFilter)}
@@ -488,7 +496,13 @@ export function RemindersPage() {
           <MenuItem value="t">Due today</MenuItem>
           <MenuItem value="u">Upcoming</MenuItem>
         </TextField>
-        <TextField select label="Priority" value={priority} onChange={(event) => setPriority(event.target.value)}>
+        <TextField
+          select
+          size="small"
+          label="Priority"
+          value={priority}
+          onChange={(event) => setPriority(event.target.value)}
+        >
           <MenuItem value="">All</MenuItem>
           <MenuItem value="high">Hot</MenuItem>
           <MenuItem value="medium">Warm</MenuItem>
@@ -512,7 +526,6 @@ export function RemindersPage() {
             py: 1.5,
             alignItems: { sm: 'center' },
             background: 'linear-gradient(180deg,#eaf1ff,#f6f9ff)',
-            borderBottom: '1px solid #dbe3ee',
           }}
         >
           <Typography fontWeight={700} sx={{ flex: 1, fontSize: 16 }}>
@@ -544,7 +557,7 @@ export function RemindersPage() {
           <Stack
             direction="row"
             spacing={1}
-            sx={{ px: 2, py: 1, bgcolor: '#eff6ff', borderBottom: '1px solid #dbe3ee', alignItems: 'center' }}
+            sx={{ px: 2, py: 1, bgcolor: '#eff6ff', alignItems: 'center' }}
           >
             <Typography variant="body2" fontWeight={700}>
               {selected.length} selected
@@ -574,7 +587,6 @@ export function RemindersPage() {
                 width: '100%',
                 px: 2,
                 py: 1,
-                borderBottom: '1px solid #dbe3ee',
                 bgcolor: '#f8fafc',
               }}
             >
@@ -658,7 +670,6 @@ export function RemindersPage() {
                     width: '100%',
                     px: 2,
                     py: 1.1,
-                    borderBottom: '1px solid #edf1f7',
                     bgcolor: on ? '#eff6ff' : 'transparent',
                     cursor: 'pointer',
                     '&:hover': { bgcolor: on ? '#eff6ff' : '#f8fbff' },

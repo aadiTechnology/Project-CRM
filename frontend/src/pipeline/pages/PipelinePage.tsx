@@ -313,9 +313,6 @@ export function PipelinePage() {
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5}>
         <Box>
           <Typography variant="h1">Sales Pipeline</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-            Stages are per project. New is fixed for every project; other columns can differ.
-          </Typography>
         </Box>
         {canManage ? (
           <Button
@@ -339,7 +336,7 @@ export function PipelinePage() {
           required
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
-          sx={{ minWidth: 200 }}
+          sx={{ width: { xs: '100%', md: 200 } }}
         >
           {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
           {projects.map((project) => (
@@ -353,7 +350,7 @@ export function PipelinePage() {
           placeholder="Search name, mobile, location…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 220, flex: 1 }}
+          sx={{ width: { xs: '100%', md: 260 } }}
           disabled={!projectId}
         />
         <TextField
@@ -362,7 +359,7 @@ export function PipelinePage() {
           label="Source"
           value={source}
           onChange={(e) => setSource(e.target.value)}
-          sx={{ minWidth: 140 }}
+          sx={{ width: { xs: '100%', md: 150 } }}
           disabled={!projectId}
         >
           <MenuItem value="">All sources</MenuItem>
@@ -378,7 +375,7 @@ export function PipelinePage() {
           label="Priority"
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
-          sx={{ minWidth: 130 }}
+          sx={{ width: { xs: '100%', md: 140 } }}
           disabled={!projectId}
         >
           <MenuItem value="">All priorities</MenuItem>

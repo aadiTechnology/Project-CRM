@@ -610,7 +610,7 @@ export function LeadsPage() {
         </TextField>
 
         <TextField
-          label="Full name"
+          label="Lead name"
           value={form.full_name}
           required
           fullWidth
@@ -866,16 +866,9 @@ export function LeadsPage() {
   return (
     <Stack spacing={2.5}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-        <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h1">Leads</Typography>
-          <Typography color="text.secondary">
-            {isOwner
-              ? 'Every lead in your business. Open one to review status and follow-ups.'
-              : projects.length
-                ? `Your leads on ${projects.map((project) => project.name).join(', ')}. Create one under a project you are assigned to.`
-                : 'Your leads only. Ask your business owner to assign you to a project on Team first.'}
-          </Typography>
-        </Stack>
+        <Typography variant="h1" sx={{ flex: 1, minWidth: 0 }}>
+          Leads
+        </Typography>
         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
           <Tooltip
             title={
@@ -1004,12 +997,19 @@ export function LeadsPage() {
         }}
       >
         <TextField
+          size="small"
           label="Search"
           placeholder="Name, mobile, email…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <TextField select label="Project" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
+        <TextField
+          select
+          size="small"
+          label="Project"
+          value={projectFilter}
+          onChange={(event) => setProjectFilter(event.target.value)}
+        >
           <MenuItem value="">All projects</MenuItem>
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
@@ -1017,7 +1017,7 @@ export function LeadsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <TextField select size="small" label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
           <MenuItem value="">All statuses</MenuItem>
           {LEAD_STATUSES.map((item) => (
             <MenuItem key={item} value={item}>
@@ -1025,7 +1025,13 @@ export function LeadsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select label="Priority" value={priority} onChange={(event) => setPriority(event.target.value)}>
+        <TextField
+          select
+          size="small"
+          label="Priority"
+          value={priority}
+          onChange={(event) => setPriority(event.target.value)}
+        >
           <MenuItem value="">All</MenuItem>
           {LEAD_PRIORITIES.map((item) => (
             <MenuItem key={item} value={item}>
@@ -1033,7 +1039,7 @@ export function LeadsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select label="Source" value={source} onChange={(event) => setSource(event.target.value)}>
+        <TextField select size="small" label="Source" value={source} onChange={(event) => setSource(event.target.value)}>
           <MenuItem value="">All sources</MenuItem>
           {LEAD_SOURCES.map((item) => (
             <MenuItem key={item} value={item}>
@@ -1053,7 +1059,7 @@ export function LeadsPage() {
           boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
         }}
       >
-        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ px: 2, py: 1.5 }}>
           <Typography fontWeight={700}>
             {total} lead{total === 1 ? '' : 's'}
           </Typography>
@@ -1078,7 +1084,6 @@ export function LeadsPage() {
                   px: 2,
                   py: 1,
                   bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #dbe3ee',
                 }}
               >
                 <Typography variant="caption" fontWeight={700} color="text.secondary">
@@ -1156,7 +1161,6 @@ export function LeadsPage() {
                       alignItems: 'center',
                       px: 2,
                       py: 1.15,
-                      borderBottom: '1px solid #edf1f7',
                       cursor: clickable ? 'pointer' : 'default',
                       '&:hover': { bgcolor: '#f8fbff' },
                     }}
@@ -1348,6 +1352,11 @@ export function LeadsPage() {
                 <Alert severity={importResult.created > 0 ? 'success' : 'warning'}>
                   Imported {importResult.created} lead(s)
                   {importResult.skipped ? `; skipped ${importResult.skipped}` : ''}.
+                  {importResult.errors[0]
+                    ? ` First error — row ${importResult.errors[0].row}${
+                        importResult.errors[0].name ? ` (${importResult.errors[0].name})` : ''
+                      }: ${importResult.errors[0].message}`
+                    : ''}
                 </Alert>
                 {importResult.errors.length > 0 ? (
                   <Box
@@ -1430,12 +1439,24 @@ export function LeadsPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={createOpen} onClose={closeCreateDialog} fullScreen={phone} fullWidth maxWidth="sm">
-        <Box component="form" onSubmit={(event) => void onCreate(event)}>
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1 }}>
-            <Box component="span" sx={{ flex: 1 }}>
-              Create lead
-            </Box>
+      <Dialog
+        open={createOpen}
+        onClose={closeCreateDialog}
+        fullScreen={phone}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+        PaperProps={{ sx: { maxHeight: phone ? '100%' : '90vh' } }}
+      >
+        <Box
+          component="form"
+          onSubmit={(event) => void onCreate(event)}
+          sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: '100%' }}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1, flexShrink: 0 }}>
+            <Typography component="span" sx={{ flex: 1, minWidth: 0 }} noWrap fontWeight={700}>
+              {form.full_name.trim() || 'Create lead'}
+            </Typography>
             <IconButton
               type="button"
               aria-label="Close"
@@ -1450,8 +1471,10 @@ export function LeadsPage() {
               <CloseOutlinedIcon fontSize="small" />
             </IconButton>
           </DialogTitle>
-          <DialogContent>{formFields(saving)}</DialogContent>
-          <DialogActions>
+          <DialogContent dividers sx={{ overflowY: 'auto', flex: '1 1 auto' }}>
+            {formFields(saving)}
+          </DialogContent>
+          <DialogActions sx={{ flexShrink: 0 }}>
             <Button
               type="button"
               onClick={(event) => {
@@ -1469,12 +1492,24 @@ export function LeadsPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={Boolean(editLead)} onClose={closeEditDialog} fullScreen={phone} fullWidth maxWidth="sm">
-        <Box component="form" onSubmit={(event) => void onSaveEdit(event)}>
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1 }}>
-            <Box component="span" sx={{ flex: 1 }}>
-              {editLead?.full_name ?? 'Lead'}
-            </Box>
+      <Dialog
+        open={Boolean(editLead)}
+        onClose={closeEditDialog}
+        fullScreen={phone}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+        PaperProps={{ sx: { maxHeight: phone ? '100%' : '90vh' } }}
+      >
+        <Box
+          component="form"
+          onSubmit={(event) => void onSaveEdit(event)}
+          sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: '100%' }}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1, flexShrink: 0 }}>
+            <Typography component="span" sx={{ flex: 1, minWidth: 0 }} noWrap fontWeight={700}>
+              {form.full_name.trim() || editLead?.full_name || 'Lead'}
+            </Typography>
             <IconButton
               type="button"
               aria-label="Close"
@@ -1489,7 +1524,7 @@ export function LeadsPage() {
               <CloseOutlinedIcon fontSize="small" />
             </IconButton>
           </DialogTitle>
-          <DialogContent>
+          <DialogContent dividers sx={{ overflowY: 'auto', flex: '1 1 auto' }}>
             {editLead ? (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                 {editLead.lead_number}
@@ -1498,7 +1533,7 @@ export function LeadsPage() {
             ) : null}
             {formFields(!canUpdate || saving)}
           </DialogContent>
-          <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <DialogActions sx={{ justifyContent: 'space-between', flexShrink: 0 }}>
             {canDelete ? (
               <Button type="button" color="error" disabled={saving} onClick={() => void onDelete()}>
                 Delete

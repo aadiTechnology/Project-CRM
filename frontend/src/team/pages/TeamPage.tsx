@@ -216,11 +216,6 @@ export function TeamPage() {
     <Stack spacing={3}>
       <Stack spacing={0.75}>
         <Typography variant="h1">Team</Typography>
-        <Typography color="text.secondary">
-          {isPlatform
-            ? 'Assign each project to the business owners who should see it. Then those owners put salespeople on the project.'
-            : 'Assign salespeople to projects. When you hand a project to someone else, their leads move with it. Lead names are never shown here.'}
-        </Typography>
       </Stack>
 
       {error ? <ErrorAlert message={error} /> : null}
@@ -260,7 +255,7 @@ export function TeamPage() {
           overflow: 'auto',
         }}
       >
-        <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ px: 2, py: 1.5 }}>
           <Typography fontWeight={600}>
             {isPlatform ? 'Business owner × project' : 'Salesperson × project'}
           </Typography>
@@ -272,7 +267,12 @@ export function TeamPage() {
               : 'Add a salesperson and wait for projects from the platform admin.'}
           </Typography>
         ) : (
-          <Table size="small">
+          <Table
+            size="small"
+            sx={{
+              '& .MuiTableCell-root': { borderBottom: 'none' },
+            }}
+          >
             <TableHead>
               <TableRow>
                 <TableCell>{isPlatform ? 'Business owner' : 'Salesperson'}</TableCell>
@@ -316,7 +316,7 @@ export function TeamPage() {
           </Table>
         )}
         {!isPlatform ? (
-          <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ p: 2 }}>
             <Button variant="contained" onClick={() => setAddOpen(true)}>
               + Add salesperson
             </Button>
@@ -393,10 +393,15 @@ export function TeamPage() {
             overflow: 'auto',
           }}
         >
-          <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ px: 2, py: 1.5 }}>
             <Typography fontWeight={600}>Lead counts</Typography>
           </Box>
-          <Table size="small">
+          <Table
+            size="small"
+            sx={{
+              '& .MuiTableCell-root': { borderBottom: 'none' },
+            }}
+          >
             <TableHead>
               <TableRow>
                 <TableCell>Person</TableCell>
