@@ -100,7 +100,6 @@ export function AppRoutes() {
             item.id !== 'projects' &&
             item.id !== 'team' &&
             item.id !== 'leads' &&
-            item.id !== 'leadFields' &&
             item.id !== 'pipeline' &&
             item.id !== 'reminders' &&
             item.id !== 'followUps' &&

@@ -3,6 +3,7 @@ import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined'
 import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined'
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined'
 import {
   Alert,
   Box,
@@ -13,6 +14,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Drawer,
   FormControlLabel,
   IconButton,
   MenuItem,
@@ -30,6 +32,7 @@ import { ColumnChooser } from '../../column-visibility/ColumnChooser'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManager'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
 import { ApiError } from '../../services/api/errors'
@@ -132,8 +135,9 @@ export function LeadsPage() {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('sm'))
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const openLeadId = searchParams.get('open')
+  const manageFieldsFromQuery = searchParams.get('manageFields') === '1'
   const openedFromQuery = useRef<string | null>(null)
   const { user } = useAuth()
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
@@ -182,6 +186,8 @@ export function LeadsPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [projectFields, setProjectFields] = useState<LeadField[]>([])
   const [listFields, setListFields] = useState<LeadField[]>([])
+  const [fieldsDrawerOpen, setFieldsDrawerOpen] = useState(false)
+  const [manageProjectId, setManageProjectId] = useState('')
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -292,6 +298,44 @@ export function LeadsPage() {
       setListFields(fields.filter((field) => field.is_active && field.show_in_list))
     })()
   }, [fetchFields, projectFilter])
+
+  const refreshListFields = useCallback(async () => {
+    if (!projectFilter) {
+      setListFields([])
+      return
+    }
+    const fields = await fetchFields(projectFilter)
+    setListFields(fields.filter((field) => field.is_active && field.show_in_list))
+  }, [fetchFields, projectFilter])
+
+  const refreshFieldsAfterManage = useCallback(async () => {
+    await refreshListFields()
+    if (form.project_id) {
+      await loadProjectFields(form.project_id)
+    }
+  }, [form.project_id, loadProjectFields, refreshListFields])
+
+  function openFieldsDrawer(projectId?: string) {
+    const next = projectId || projectFilter || projects[0]?.id || ''
+    setManageProjectId(next)
+    setFieldsDrawerOpen(true)
+  }
+
+  function closeFieldsDrawer() {
+    setFieldsDrawerOpen(false)
+    if (manageFieldsFromQuery) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('manageFields')
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  useEffect(() => {
+    if (!manageFieldsFromQuery || fieldsDrawerOpen) return
+    if (projects.length === 0) return
+    openFieldsDrawer(projectFilter || projects[0]?.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manageFieldsFromQuery, projects, projectFilter])
 
   async function openCreate() {
     const list = projects.length ? projects : await loadProjects()
@@ -772,63 +816,96 @@ export function LeadsPage() {
                 : 'Your leads only. Ask your business owner to assign you to a project on Team first.'}
           </Typography>
         </Stack>
-        {canCreate ? (
-          <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-            <Tooltip title="Import leads">
-              <span>
-                <IconButton
-                  size="small"
-                  color="primary"
-                  aria-label="Import leads"
-                  disabled={isSales && projects.length === 0}
-                  onClick={() => {
-                    setError('')
-                    setNotice('')
-                    setImportResult(null)
-                    setImportFile(null)
-                    if (importInputRef.current) importInputRef.current.value = ''
-                    setImportProjectId(projectFilter || projects[0]?.id || '')
-                    setImportOpen(true)
-                  }}
-                  sx={{
-                    bgcolor: '#fff',
-                    color: 'primary.main',
-                    width: 32,
-                    height: 32,
-                    borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&:hover': { bgcolor: '#eef2ff' },
-                  }}
-                >
-                  <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="Create lead">
-              <span>
-                <IconButton
-                  size="small"
-                  color="primary"
-                  aria-label="Create lead"
-                  disabled={isSales && projects.length === 0}
-                  onClick={() => void openCreate()}
-                  sx={{
-                    bgcolor: 'primary.main',
-                    color: '#fff',
-                    width: 32,
-                    height: 32,
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                    '&:hover': { bgcolor: 'primary.dark' },
-                  }}
-                >
-                  <AddOutlinedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Stack>
-        ) : null}
+        <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+          <Tooltip
+            title={
+              projects.length === 0
+                ? 'Assign a project first to manage fields'
+                : projectFilter
+                  ? 'Manage fields for the filtered project'
+                  : 'Manage extra fields for a project'
+            }
+          >
+            <span>
+              <IconButton
+                size="small"
+                color="primary"
+                aria-label="Manage fields"
+                disabled={projects.length === 0}
+                onClick={() => openFieldsDrawer()}
+                sx={{
+                  bgcolor: '#fff',
+                  color: 'primary.main',
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': { bgcolor: '#eef2ff' },
+                }}
+              >
+                <TuneOutlinedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
+          {canCreate ? (
+            <>
+              <Tooltip title="Import leads">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    aria-label="Import leads"
+                    disabled={isSales && projects.length === 0}
+                    onClick={() => {
+                      setError('')
+                      setNotice('')
+                      setImportResult(null)
+                      setImportFile(null)
+                      if (importInputRef.current) importInputRef.current.value = ''
+                      setImportProjectId(projectFilter || projects[0]?.id || '')
+                      setImportOpen(true)
+                    }}
+                    sx={{
+                      bgcolor: '#fff',
+                      color: 'primary.main',
+                      width: 32,
+                      height: 32,
+                      borderRadius: '8px',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { bgcolor: '#eef2ff' },
+                    }}
+                  >
+                    <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Create lead">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    aria-label="Create lead"
+                    disabled={isSales && projects.length === 0}
+                    onClick={() => void openCreate()}
+                    sx={{
+                      bgcolor: 'primary.main',
+                      color: '#fff',
+                      width: 32,
+                      height: 32,
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 10px rgba(29,78,216,.2)',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                    }}
+                  >
+                    <AddOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </>
+          ) : null}
+        </Stack>
         <ColumnChooser
           columns={columnDefs}
           visibility={columnVisibility}
@@ -1128,8 +1205,8 @@ export function LeadsPage() {
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 0.5 }}>
             <Typography variant="body2" color="text.secondary">
-              Upload an Excel .xlsx file. Columns are matched by header name to this project&apos;s Lead Fields.
-              Repeated call-summary columns merge into Follow-up notes.
+              Upload an Excel .xlsx file. Columns are matched by header name to this project&apos;s fields
+              (Manage fields on Leads). Repeated call-summary columns merge into Follow-up notes.
             </Typography>
             <TextField
               select
@@ -1352,6 +1429,41 @@ export function LeadsPage() {
           </DialogActions>
         </Box>
       </Dialog>
+
+      <Drawer
+        anchor="right"
+        open={fieldsDrawerOpen}
+        onClose={closeFieldsDrawer}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 520, md: 640 },
+            p: 2,
+            boxSizing: 'border-box',
+          },
+        }}
+      >
+        <Stack spacing={1.5} sx={{ height: '100%' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Typography variant="h2" sx={{ flex: 1, fontSize: 20, fontWeight: 700 }}>
+              Manage fields
+            </Typography>
+            <IconButton aria-label="Close manage fields" onClick={closeFieldsDrawer} size="small">
+              <CloseOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Extra columns for one project. They show on Create lead, Import, and the lead list when marked In list.
+          </Typography>
+          <LeadFieldsManager
+            projectId={manageProjectId}
+            projects={projects}
+            showProjectSelector
+            showTitle={false}
+            onProjectChange={setManageProjectId}
+            onChanged={() => void refreshFieldsAfterManage()}
+          />
+        </Stack>
+      </Drawer>
     </Stack>
   )
 }

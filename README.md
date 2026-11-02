@@ -72,7 +72,7 @@ Upload an `.xlsx` file on **Leads** → the app maps column headers to common le
 ### Before import
 
 1. Login as **Business Owner** or **Salesperson** (salesperson must be assigned to the project on Team).
-2. Open **Lead Fields** → select the project (e.g. Paneerwala) → create fields that match your Excel headers (Product, Quantity, Payment, Call time, Follow-up notes, etc.).
+2. Open **Leads** → **Manage fields** (tune icon) → select the project (e.g. Paneerwala) → create fields that match your Excel headers (Product, Quantity, Payment, Call time, Follow-up notes, etc.).
 3. Prepare Excel: first row = headers; every data row needs **Name** and **Phone**.
 
 ### Import steps

@@ -10,7 +10,6 @@ import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined'
 import TaskAltOutlinedIcon from '@mui/icons-material/TaskAltOutlined'
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
-import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined'
 import WorkOutlineOutlinedIcon from '@mui/icons-material/WorkOutlineOutlined'
 
 export const SECTIONS = ['menu'] as const
@@ -64,7 +63,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { id: 'reminders', path: '/app/reminders', section: 'menu', roles: SALES, ready: true, icon: TodayOutlinedIcon },
   { id: 'leads', path: '/app/leads', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: PersonSearchOutlinedIcon },
-  { id: 'leadFields', path: '/app/lead-fields', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: TuneOutlinedIcon },
   { id: 'pipeline', path: '/app/pipeline', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AccountTreeOutlinedIcon },
   { id: 'followUps', path: '/app/follow-ups', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: TaskAltOutlinedIcon },
   { id: 'kpis', path: '/app/kpis', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AssessmentOutlinedIcon },
