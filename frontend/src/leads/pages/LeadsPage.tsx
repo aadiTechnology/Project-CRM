@@ -33,13 +33,16 @@ import type { ColumnDef } from '../../column-visibility/definitions'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
+import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
 import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManager'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
+import { ReminderLeadDrawer } from '../../reminders/components/ReminderLeadDrawer'
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
-import { defaultFollowupLocal, formatDueLabel, localInputToIso, toDatetimeLocalValue } from '../lead-dates'
+import { defaultFollowupLocal, formatDueLabel, localInputToIso } from '../lead-dates'
 import {
   LEAD_PRIORITIES,
   LEAD_SOURCES,
@@ -129,18 +132,6 @@ function formatExtraDisplay(value: unknown): string {
   return String(value)
 }
 
-function extraFromLead(lead: Lead): Record<string, string | string[] | boolean> {
-  const next: Record<string, string | string[] | boolean> = {}
-  for (const [key, value] of Object.entries(lead.extra_values ?? {})) {
-    if (typeof value === 'boolean' || typeof value === 'string' || Array.isArray(value)) {
-      next[key] = value as string | string[] | boolean
-    } else if (typeof value === 'number') {
-      next[key] = String(value)
-    }
-  }
-  return next
-}
-
 export function LeadsPage() {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('sm'))
@@ -152,7 +143,6 @@ export function LeadsPage() {
   const { user } = useAuth()
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
-  const canDelete = Boolean(user?.permissions.includes('leads.delete'))
   const isOwner = Boolean(user?.roles.includes('BUSINESS_OWNER'))
   const isSales = Boolean(user?.roles.includes('SALESPERSON')) && !isOwner
 
@@ -169,6 +159,10 @@ export function LeadsPage() {
   const [projectFilter, setProjectFilter] = useState('')
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
+  const [drawerFallback, setDrawerFallback] = useState<Lead | null>(null)
+  const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
+  const [planOpen, setPlanOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importProjectId, setImportProjectId] = useState('')
   const [importFile, setImportFile] = useState<File | null>(null)
@@ -178,7 +172,6 @@ export function LeadsPage() {
     skipped: number
     errors: { row: number; message: string; name?: string | null; mobile?: string | null }[]
   } | null>(null)
-  const [editLead, setEditLead] = useState<Lead | null>(null)
   const [form, setForm] = useState<LeadForm>(blankForm())
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [projectFields, setProjectFields] = useState<LeadField[]>([])
@@ -396,33 +389,31 @@ export function LeadsPage() {
     setCreateOpen(false)
   }
 
-  function closeEditDialog() {
-    if (saving) return
-    setEditLead(null)
+  useEffect(() => {
+    setPlan(loadFollowupPlan(user?.company_id))
+  }, [user?.company_id])
+
+  const drawerLead = useMemo(() => {
+    if (!drawerLeadId) return null
+    return items.find((lead) => lead.id === drawerLeadId) ?? (drawerFallback?.id === drawerLeadId ? drawerFallback : null)
+  }, [drawerFallback, drawerLeadId, items])
+
+  const onDrawerChanged = useCallback(
+    async (message: string) => {
+      setNotice(message)
+      await load()
+    },
+    [load],
+  )
+
+  function openLead(lead: Lead) {
+    setDrawerLeadId(lead.id)
+    setDrawerFallback(lead)
   }
 
-  async function openEdit(lead: Lead) {
-    setEditLead(lead)
-    setForm({
-      project_id: lead.project_id ?? '',
-      full_name: lead.full_name,
-      mobile: lead.mobile,
-      email: lead.email ?? '',
-      city: lead.city ?? '',
-      lead_source: lead.lead_source ?? '',
-      requirement: lead.requirement ?? '',
-      enquiry_date: lead.enquiry_date ?? '',
-      reference_name: lead.reference_name ?? '',
-      call_summary: lead.call_summary ?? '',
-      status: lead.status,
-      priority: lead.priority,
-      next_followup_at: lead.next_followup_at
-        ? toDatetimeLocalValue(new Date(lead.next_followup_at))
-        : defaultFollowupLocal(),
-      extra_values: extraFromLead(lead),
-    })
-    setFieldErrors({})
-    await loadProjectFields(lead.project_id ?? '')
+  function closeLeadDrawer() {
+    setDrawerLeadId(null)
+    setDrawerFallback(null)
   }
 
   useEffect(() => {
@@ -437,7 +428,7 @@ export function LeadsPage() {
           (await api.get<Lead>(`/api/v1/leads/${openLeadId}`)).data
         if (cancelled) return
         openedFromQuery.current = openLeadId
-        await openEdit(lead)
+        openLead(lead)
         navigate('/app/leads', { replace: true })
       } catch {
         if (!cancelled) {
@@ -451,8 +442,6 @@ export function LeadsPage() {
     return () => {
       cancelled = true
     }
-    // openEdit reads current form helpers; run once per openLeadId after list load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, loading, navigate, openLeadId])
 
   function validate(): boolean {
@@ -532,45 +521,6 @@ export function LeadsPage() {
         setFieldErrors(next)
       }
       setError(requestError instanceof ApiError ? requestError.message : 'Could not create lead.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function onSaveEdit(event: FormEvent) {
-    event.preventDefault()
-    if (!editLead || !validate()) return
-    setSaving(true)
-    setError('')
-    setNotice('')
-    try {
-      await api.patch<Lead>(`/api/v1/leads/${editLead.id}`, payloadFromForm())
-      setEditLead(null)
-      setNotice('Lead updated.')
-      await load()
-    } catch (requestError) {
-      if (requestError instanceof ApiError && requestError.details?.length) {
-        const next: Record<string, string> = {}
-        for (const detail of requestError.details) next[detail.field] = detail.message
-        setFieldErrors(next)
-      }
-      setError(requestError instanceof ApiError ? requestError.message : 'Could not update lead.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function onDelete() {
-    if (!editLead) return
-    setSaving(true)
-    setError('')
-    try {
-      await api.delete(`/api/v1/leads/${editLead.id}`)
-      setEditLead(null)
-      setNotice('Lead deleted.')
-      await load()
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : 'Could not delete lead.')
     } finally {
       setSaving(false)
     }
@@ -1148,7 +1098,7 @@ export function LeadsPage() {
                   <Box
                     key={lead.id}
                     onClick={() => {
-                      if (clickable) void openEdit(lead)
+                      if (clickable) openLead(lead)
                     }}
                     sx={{
                       display: 'grid',
@@ -1261,7 +1211,7 @@ export function LeadsPage() {
                         <IconButton
                           size="small"
                           aria-label={`Open ${lead.full_name}`}
-                          onClick={() => void openEdit(lead)}
+                          onClick={() => openLead(lead)}
                           sx={{
                             width: 30,
                             height: 30,
@@ -1492,75 +1442,21 @@ export function LeadsPage() {
         </Box>
       </Dialog>
 
-      <Dialog
-        open={Boolean(editLead)}
-        onClose={closeEditDialog}
-        fullScreen={phone}
-        fullWidth
-        maxWidth="sm"
-        scroll="paper"
-        PaperProps={{ sx: { maxHeight: phone ? '100%' : '90vh' } }}
-      >
-        <Box
-          component="form"
-          onSubmit={(event) => void onSaveEdit(event)}
-          sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: '100%' }}
-        >
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1, flexShrink: 0 }}>
-            <Typography component="span" sx={{ flex: 1, minWidth: 0 }} noWrap fontWeight={700}>
-              {form.full_name.trim() || editLead?.full_name || 'Lead'}
-            </Typography>
-            <IconButton
-              type="button"
-              aria-label="Close"
-              onClick={(event) => {
-                event.preventDefault()
-                closeEditDialog()
-              }}
-              edge="end"
-              size="small"
-              disabled={saving}
-            >
-              <CloseOutlinedIcon fontSize="small" />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers sx={{ overflowY: 'auto', flex: '1 1 auto' }}>
-            {editLead ? (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                {editLead.lead_number}
-                {editLead.project_name ? ` · ${editLead.project_name}` : ''}
-              </Typography>
-            ) : null}
-            {formFields(!canUpdate || saving)}
-          </DialogContent>
-          <DialogActions sx={{ justifyContent: 'space-between', flexShrink: 0 }}>
-            {canDelete ? (
-              <Button type="button" color="error" disabled={saving} onClick={() => void onDelete()}>
-                Delete
-              </Button>
-            ) : (
-              <span />
-            )}
-            <Stack direction="row" spacing={1}>
-              <Button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault()
-                  closeEditDialog()
-                }}
-                disabled={saving}
-              >
-                Close
-              </Button>
-              {canUpdate ? (
-                <Button type="submit" variant="contained" disabled={saving}>
-                  Save
-                </Button>
-              ) : null}
-            </Stack>
-          </DialogActions>
-        </Box>
-      </Dialog>
+      <ReminderLeadDrawer
+        lead={drawerLead}
+        canUpdate={canUpdate}
+        plan={plan}
+        onClose={closeLeadDrawer}
+        onChanged={onDrawerChanged}
+        onEditPlan={() => setPlanOpen(true)}
+      />
+
+      <FollowupPlanSettingsDialog
+        open={planOpen}
+        companyId={user?.company_id}
+        onClose={() => setPlanOpen(false)}
+        onSaved={setPlan}
+      />
 
       <Drawer
         anchor="right"

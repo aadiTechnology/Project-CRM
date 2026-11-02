@@ -22,6 +22,7 @@ import { ColumnChooser } from '../../column-visibility/ColumnChooser'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import {
   CUSTOM_STEP,
   FollowupPlanStep,
@@ -38,6 +39,7 @@ import {
   PRIORITY_TONE,
   type LeadPriority,
 } from '../../leads/types'
+import { ReminderLeadDrawer } from '../../reminders/components/ReminderLeadDrawer'
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
@@ -93,9 +95,12 @@ export function FollowUpsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [projectId, setProjectId] = useState('')
+  const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [tally, setTally] = useState<SessionTally>({ connected: 0, noAnswer: 0, snoozed: 0, skipped: 0 })
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
+  const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
+  const [planOpen, setPlanOpen] = useState(false)
 
   useEffect(() => {
     setPlan(loadFollowupPlan(user?.company_id))
@@ -161,6 +166,35 @@ export function FollowUpsPage() {
       `Open plans by step. Completed this session: ${tally.connected} connected · ${tally.noAnswer} no answer · ${tally.snoozed} snoozed · ${tally.skipped} skipped.`,
     [tally],
   )
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((lead) =>
+      [lead.full_name, lead.mobile, lead.lead_number, lead.requirement, lead.city, lead.project_name, lead.plan_step]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q),
+    )
+  }, [items, search])
+
+  const drawerLead = useMemo(
+    () => (drawerLeadId ? items.find((item) => item.id === drawerLeadId) ?? null : null),
+    [drawerLeadId, items],
+  )
+
+  const onDrawerChanged = useCallback(
+    async (message: string) => {
+      setNotice(message)
+      await load()
+    },
+    [load],
+  )
+
+  function openLead(lead: Lead) {
+    setDrawerLeadId(lead.id)
+  }
 
   async function patchOutcome(
     lead: Lead,
@@ -243,12 +277,20 @@ export function FollowUpsPage() {
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'flex-start' } }}>
         <TextField
+          size="small"
+          label="Search"
+          placeholder="Name, mobile, lead ID…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          sx={{ width: { xs: '100%', sm: 260 } }}
+        />
+        <TextField
           select
           size="small"
           label="Project"
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
-          sx={{ minWidth: { xs: '100%', sm: 220 } }}
+          sx={{ width: { xs: '100%', sm: 220 } }}
         >
           <MenuItem value="">All projects</MenuItem>
           {projects.map((project) => (
@@ -324,12 +366,12 @@ export function FollowUpsPage() {
           </Box>
         ) : null}
 
-        {items.length === 0 ? (
+        {filtered.length === 0 ? (
           <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-            No open follow-ups in your scope.
+            {search.trim() ? 'No follow-ups match this search.' : 'No open follow-ups in your scope.'}
           </Typography>
         ) : (
-          items.map((lead) => {
+          filtered.map((lead) => {
             const due = dueDisplay(lead)
             const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
             const planLabel = lead.plan_step || plan[0]?.label || 'Day 1'
@@ -337,6 +379,7 @@ export function FollowUpsPage() {
             return (
               <Box
                 key={lead.id}
+                onClick={() => openLead(lead)}
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: {
@@ -349,6 +392,7 @@ export function FollowUpsPage() {
                   px: 2,
                   py: 1.15,
                   borderBottom: '1px solid #edf1f7',
+                  cursor: 'pointer',
                   '&:hover': { bgcolor: '#f8fbff' },
                 }}
               >
@@ -431,7 +475,12 @@ export function FollowUpsPage() {
                 ) : null}
 
                 {canUpdate ? (
-                  <Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}>
+                  <Stack
+                    direction="row"
+                    spacing={0.25}
+                    sx={{ justifyContent: 'flex-end' }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <Tooltip title="Connected">
                       <span>
                         <IconButton
@@ -500,6 +549,22 @@ export function FollowUpsPage() {
           })
         )}
       </Box>
+
+      <ReminderLeadDrawer
+        lead={drawerLead}
+        canUpdate={canUpdate}
+        plan={plan}
+        onClose={() => setDrawerLeadId(null)}
+        onChanged={onDrawerChanged}
+        onEditPlan={() => setPlanOpen(true)}
+      />
+
+      <FollowupPlanSettingsDialog
+        open={planOpen}
+        companyId={user?.company_id}
+        onClose={() => setPlanOpen(false)}
+        onSaved={setPlan}
+      />
     </Stack>
   )
 }
