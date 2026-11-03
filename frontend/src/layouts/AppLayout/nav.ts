@@ -1,6 +1,5 @@
 import type { SvgIconComponent } from '@mui/icons-material'
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
-import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined'
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined'
 import DomainOutlinedIcon from '@mui/icons-material/DomainOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
@@ -65,8 +64,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'leads', path: '/app/leads', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: PersonSearchOutlinedIcon },
   { id: 'pipeline', path: '/app/pipeline', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AccountTreeOutlinedIcon },
   { id: 'followUps', path: '/app/follow-ups', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: TaskAltOutlinedIcon },
-  // KPIs hidden from sidebar for now (route still available)
-  { id: 'kpis', path: '/app/kpis', section: 'menu', roles: [...OWNER, ...SALES], ready: false, icon: AssessmentOutlinedIcon },
+  // KPIs: route kept in AppRoutes; intentionally omitted from sidebar.
   { id: 'campaigns', path: '/app/campaigns', section: 'menu', roles: MARKETING, icon: CampaignOutlinedIcon },
 ]
 
