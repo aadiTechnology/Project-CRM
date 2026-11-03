@@ -672,16 +672,7 @@ export function LeadsPage() {
           onChange={(event) => setForm((current) => ({ ...current, requirement: event.target.value }))}
         />
 
-        <TextField
-          label="Call Summary"
-          value={form.call_summary}
-          fullWidth
-          multiline
-          minRows={2}
-          disabled={disabled}
-          placeholder="Notes from the call"
-          onChange={(event) => setForm((current) => ({ ...current, call_summary: event.target.value }))}
-        />
+        {/* Hidden: Call Summary — use Set date / next follow-up instead */}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField

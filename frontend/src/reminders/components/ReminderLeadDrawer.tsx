@@ -14,7 +14,7 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
@@ -24,8 +24,6 @@ import {
   CUSTOM_STEP,
   FollowupPlanStep,
   gapForStep,
-  nextPlanStep,
-  waitDaysAfterStep,
 } from '../../followup-plan/plan'
 import {
   addDaysIso,
@@ -70,15 +68,7 @@ const HIDDEN_EXTRA_FIELD_LABELS = new Set([
   'number of branches',
 ])
 
-type ActionKind = 'noanswer' | 'skip' | 'note' | null
-
-function currentPlanLabel(lead: Lead, plan: FollowupPlanStep[]) {
-  const step = (lead.plan_step || '').trim()
-  if (!step) return plan[0]?.label || 'Day 1'
-  if (step === CUSTOM_STEP) return CUSTOM_STEP
-  if (plan.some((item) => item.label === step)) return step
-  return step
-}
+type ActionKind = 'noanswer' | null
 
 function formFromLead(lead: Lead): DrawerForm {
   const extras: Record<string, string> = {}
@@ -181,7 +171,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
   }, [lead, loadActivity])
 
   const statusTone = lead ? STATUS_TONE[lead.status] ?? STATUS_TONE.new : STATUS_TONE.new
-  const currentStep = lead ? currentPlanLabel(lead, plan) : plan[0]?.label || 'Day 1'
 
   const closed = lead ? lead.status === 'won' || lead.status === 'lost' : false
 
@@ -228,25 +217,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
     }
   }
 
-  async function saveCallDone() {
-    if (!lead || !form) return
-    const summary = form.call_summary.trim()
-    if (!summary) {
-      setLocalError('Write the Call summary above, then tap Call done.')
-      return
-    }
-    const next = nextPlanStep(plan, currentStep)
-    const waitDays = waitDaysAfterStep(plan, currentStep)
-    const body: Record<string, unknown> = {
-      call_summary: summary,
-      plan_step: next?.label ?? currentStep,
-      next_followup_at: next ? addDaysIso(null, waitDays) : null,
-      requirement: lead.requirement ? `${lead.requirement}\nCall: ${summary}` : `Call: ${summary}`,
-    }
-    if (lead.status === 'new') body.status = 'contacted'
-    await patch(body, `Call done · ${lead.full_name}`)
-  }
-
   async function submitAction(event: FormEvent) {
     event.preventDefault()
     if (!lead || !action) return
@@ -260,64 +230,10 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
         },
         `No answer · ${lead.full_name}`,
       )
-      return
-    }
-
-    if (action === 'skip') {
-      const why = actionNote.trim()
-      if (!why) {
-        setLocalError('Add a reason to skip.')
-        return
-      }
-      const next = nextPlanStep(plan, currentStep)
-      if (!next) {
-        await patch(
-          {
-            next_followup_at: null,
-            requirement: lead.requirement ? `${lead.requirement}\nSkipped: ${why}` : `Skipped: ${why}`,
-          },
-          `Skipped · ${lead.full_name}`,
-        )
-        return
-      }
-      await patch(
-        {
-          plan_step: next.label,
-          next_followup_at: addDaysIso(null, waitDaysAfterStep(plan, currentStep)),
-          requirement: lead.requirement ? `${lead.requirement}\nSkipped: ${why}` : `Skipped: ${why}`,
-        },
-        `Skipped · ${lead.full_name}`,
-      )
-      return
-    }
-
-    if (action === 'note') {
-      const note = actionNote.trim()
-      if (!note) {
-        setLocalError('Write a call summary.')
-        return
-      }
-      await patch(
-        {
-          requirement: lead.requirement ? `${lead.requirement}\nCall: ${note}` : `Call: ${note}`,
-        },
-        `Call summary saved · ${lead.full_name}`,
-      )
     }
   }
 
-  const actionTitle = useMemo(() => {
-    switch (action) {
-      case 'noanswer':
-        return 'No answer'
-      case 'skip':
-        return 'Skip step'
-      case 'note':
-        return 'Add call summary'
-      default:
-        return ''
-    }
-  }, [action])
+  const actionTitle = action === 'noanswer' ? 'No answer' : ''
 
   return (
     <>
@@ -460,20 +376,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                   }
                 }}
               />
-              <TextField
-                label="Call summary"
-                value={form.call_summary}
-                disabled={!canUpdate || saving}
-                multiline
-                minRows={3}
-                helperText="Fill this, then tap Call done"
-                onChange={(event) => setForm({ ...form, call_summary: event.target.value })}
-                onBlur={() => {
-                  if (form.call_summary !== (lead.call_summary ?? '')) {
-                    void saveField({ call_summary: form.call_summary.trim() || null })
-                  }
-                }}
-              />
+              {/* Hidden: Call summary — schedule via Set date instead */}
               <TextField
                 select
                 label="Lead Source"
@@ -648,13 +551,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                 {canUpdate && lead.next_followup_at ? (
                   <>
                     <Button
-                      variant="contained"
-                      disabled={saving}
-                      onClick={() => void saveCallDone()}
-                    >
-                      Call done
-                    </Button>
-                    <Button
                       disabled={saving}
                       onClick={() => {
                         setAction('noanswer')
@@ -674,16 +570,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                       }}
                     >
                       Snooze to tomorrow
-                    </Button>
-                    <Button
-                      disabled={saving}
-                      onClick={() => {
-                        setAction('skip')
-                        setActionNote('')
-                        setLocalError('')
-                      }}
-                    >
-                      Skip step
                     </Button>
                   </>
                 ) : null}
@@ -772,14 +658,13 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
             {lead ? ` · ${lead.full_name}` : ''}
           </DialogTitle>
           <DialogContent>
-            {action === 'noanswer' || action === 'skip' || action === 'note' ? (
+            {action === 'noanswer' ? (
               <TextField
-                label={action === 'note' ? 'Call summary' : action === 'skip' ? 'Reason' : 'One-line note'}
-                required={action !== 'noanswer'}
+                label="One-line note"
                 value={actionNote}
                 fullWidth
                 multiline
-                minRows={action === 'note' ? 3 : 2}
+                minRows={2}
                 autoFocus
                 sx={{ mt: 1 }}
                 onChange={(event) => setActionNote(event.target.value)}
