@@ -31,6 +31,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import {
@@ -314,16 +315,7 @@ export function LeadFieldsManager({
                 aria-label="Add field"
                 disabled={!projectId || saving}
                 onClick={openAdd}
-                sx={{
-                  bgcolor: 'primary.main',
-                  color: '#fff',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  '&.Mui-disabled': { bgcolor: '#93c5fd', color: '#fff' },
-                }}
+                sx={toolbarIconSx}
               >
                 <AddOutlinedIcon sx={{ fontSize: 18 }} />
               </IconButton>
@@ -340,16 +332,7 @@ export function LeadFieldsManager({
                 aria-label="Add field"
                 disabled={!projectId || saving}
                 onClick={openAdd}
-                sx={{
-                  bgcolor: 'primary.main',
-                  color: '#fff',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                  '&.Mui-disabled': { bgcolor: '#93c5fd', color: '#fff' },
-                }}
+                sx={toolbarIconSx}
               >
                 <AddOutlinedIcon sx={{ fontSize: 18 }} />
               </IconButton>

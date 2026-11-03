@@ -12,6 +12,7 @@ import {
 } from '@mui/material'
 import { useId, useState } from 'react'
 
+import { toolbarIconSx } from '../components/common/toolbarStyles'
 import type { ColumnDef } from './definitions'
 
 type ColumnChooserProps = {
@@ -19,11 +20,9 @@ type ColumnChooserProps = {
   visibility: Record<string, boolean>
   onToggle: (key: string) => void
   onReset: () => void
-  /** Match solid primary toolbar icons (e.g. Create lead). */
-  solid?: boolean
 }
 
-export function ColumnChooser({ columns, visibility, onToggle, onReset, solid = false }: ColumnChooserProps) {
+export function ColumnChooser({ columns, visibility, onToggle, onReset }: ColumnChooserProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null)
   const titleId = useId()
   const open = Boolean(anchor)
@@ -37,28 +36,7 @@ export function ColumnChooser({ columns, visibility, onToggle, onReset, solid = 
           aria-haspopup="true"
           aria-expanded={open ? 'true' : undefined}
           onClick={(event) => setAnchor(event.currentTarget)}
-          sx={
-            solid
-              ? {
-                  bgcolor: 'primary.main',
-                  color: '#fff',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                }
-              : {
-                  bgcolor: '#fff',
-                  color: 'text.secondary',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:hover': { bgcolor: '#eef2ff', color: 'primary.main' },
-                }
-          }
+          sx={toolbarIconSx}
         >
           <ViewColumnOutlinedIcon sx={{ fontSize: 18 }} />
         </IconButton>

@@ -33,6 +33,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import {
   CUSTOM_STEP,
@@ -406,15 +407,7 @@ export function RemindersPage() {
               color="primary"
               aria-label="Add reminder"
               onClick={() => setAddOpen(true)}
-              sx={{
-                bgcolor: 'primary.main',
-                color: '#fff',
-                width: 32,
-                height: 32,
-                borderRadius: '8px',
-                boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                '&:hover': { bgcolor: 'primary.dark' },
-              }}
+              sx={toolbarIconSx}
             >
               <AddOutlinedIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -813,13 +806,6 @@ export function RemindersPage() {
                           </IconButton>
                         </span>
                       </Tooltip>
-                      {canDelete ? (
-                        <DeleteIconButton
-                          onClick={() => setDeleteTarget(lead)}
-                          disabled={saving}
-                          tooltip={`Delete ${lead.full_name}`}
-                        />
-                      ) : null}
                       <Tooltip title="Reschedule">
                         <span>
                           <IconButton
@@ -836,6 +822,13 @@ export function RemindersPage() {
                           </IconButton>
                         </span>
                       </Tooltip>
+                      {canDelete ? (
+                        <DeleteIconButton
+                          onClick={() => setDeleteTarget(lead)}
+                          disabled={saving}
+                          tooltip={`Delete ${lead.full_name}`}
+                        />
+                      ) : null}
                     </Stack>
                   ) : null}
                 </Box>
