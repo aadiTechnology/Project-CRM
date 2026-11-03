@@ -221,7 +221,7 @@ export function FollowUpsPage() {
 
   const gridTemplate = phone
     ? '1fr'
-    : 'minmax(200px,1.35fr) 88px minmax(150px,1fr) 170px'
+    : 'minmax(0,1.35fr) 104px minmax(0,1.15fr) minmax(168px,0.95fr)'
 
   if (loading && items.length === 0) return <LoadingScreen />
 
@@ -355,172 +355,188 @@ export function FollowUpsPage() {
           boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
         }}
       >
-        {!phone ? (
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: gridTemplate,
-              columnGap: 2,
-              alignItems: 'center',
-              px: 2.25,
-              py: 1.15,
-              bgcolor: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
-            }}
-          >
-            <Typography sx={columnHeaderSx}>Customer</Typography>
-            <Typography sx={columnHeaderSx}>Priority</Typography>
-            <Typography sx={columnHeaderSx}>Last Remark</Typography>
-            <Typography sx={columnHeaderSx}>Next Follow-up</Typography>
-          </Box>
-        ) : null}
-
-        {filtered.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography fontWeight={700} sx={{ mb: 0.5 }}>
-              {search.trim() || dueFilter !== 'ALL' ? 'No follow-ups match' : 'No follow-ups due'}
-            </Typography>
-            <Typography color="text.secondary" variant="body2">
-              {search.trim() || dueFilter !== 'ALL'
-                ? 'Try another filter or clear search.'
-                : 'When a lead has a next follow-up date, it appears here for the salesperson.'}
-            </Typography>
-          </Box>
-        ) : (
-          filtered.map((lead) => {
-            const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
-            const tone = PRIORITY_TONE[priorityKey]
-            const remark = lastRemark(lead)
-            const next = nextFollowupMeta(lead)
-            const channel = channelForLead(lead)
-            const tel = (lead.mobile || '').replace(/\s+/g, '')
-
-            return (
+        <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
+          <Box sx={{ minWidth: { md: 760 }, width: '100%' }}>
+            {!phone ? (
               <Box
-                key={lead.id}
-                onClick={() => setDrawerLeadId(lead.id)}
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: gridTemplate,
-                  columnGap: { xs: 1, md: 2 },
-                  rowGap: 0.85,
+                  columnGap: 2,
                   alignItems: 'center',
                   px: 2.25,
-                  py: 1.4,
-                  borderBottom: '1px solid #edf1f7',
-                  cursor: 'pointer',
-                  bgcolor: next.overdue ? '#fffbfb' : 'transparent',
-                  '&:hover': { bgcolor: next.overdue ? '#fff5f5' : '#f8fbff' },
+                  py: 1.15,
+                  bgcolor: '#f8fafc',
+                  borderBottom: '1px solid #e2e8f0',
                 }}
               >
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
-                    {lead.full_name}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap display="block">
-                    {lead.lead_number}
-                    {lead.project_name ? ` · ${lead.project_name}` : ''}
-                  </Typography>
-                  {lead.mobile ? (
-                    <Typography
-                      variant="caption"
-                      component={Link}
-                      href={`tel:${tel}`}
-                      onClick={(event) => event.stopPropagation()}
-                      underline="hover"
-                      noWrap
-                      display="block"
-                      sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content' }}
-                    >
-                      {lead.mobile}
-                    </Typography>
-                  ) : null}
-                  {phone ? (
-                    <Chip
-                      size="small"
-                      label={PRIORITY_LABEL[priorityKey]}
-                      sx={{
-                        mt: 0.75,
-                        height: 24,
-                        fontWeight: 700,
-                        bgcolor: tone.bg,
-                        color: tone.color,
-                      }}
-                    />
-                  ) : null}
-                </Box>
-
-                {!phone ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Chip
-                      size="small"
-                      label={PRIORITY_LABEL[priorityKey]}
-                      sx={{
-                        height: 24,
-                        fontWeight: 700,
-                        bgcolor: tone.bg,
-                        color: tone.color,
-                      }}
-                    />
-                  </Box>
-                ) : null}
-
-                <Box sx={{ minWidth: 0 }}>
-                  {phone ? (
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 0.25 }}>
-                      Last remark
-                    </Typography>
-                  ) : null}
-                  <Typography fontWeight={600} noWrap sx={{ color: '#0f172a' }}>
-                    {remark.title}
-                  </Typography>
-                  {remark.detail ? (
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                      {remark.detail}
-                    </Typography>
-                  ) : null}
-                </Box>
-
-                <Stack spacing={0.65} sx={{ minWidth: 0 }}>
-                  {phone ? (
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
-                      Next follow-up
-                    </Typography>
-                  ) : null}
-                  <Typography
-                    variant="body2"
-                    fontWeight={next.overdue || next.today ? 700 : 600}
-                    sx={{ color: next.overdue ? '#b91c1c' : '#0f172a' }}
-                  >
-                    {next.text}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    component={tel && channel === 'call' ? 'a' : 'div'}
-                    href={tel && channel === 'call' ? `tel:${tel}` : undefined}
-                    clickable={Boolean(tel && channel === 'call')}
-                    onClick={(event: MouseEvent) => event.stopPropagation()}
-                    icon={
-                      channel === 'call' ? (
-                        <PhoneOutlinedIcon sx={{ fontSize: '14px !important' }} />
-                      ) : undefined
-                    }
-                    label={channel === 'whatsapp' ? 'WhatsApp' : 'Call'}
-                    sx={{
-                      alignSelf: 'flex-start',
-                      height: 24,
-                      fontWeight: 700,
-                      textDecoration: 'none',
-                      bgcolor: '#fce4ec',
-                      color: '#e95d90',
-                      '& .MuiChip-icon': { color: '#e95d90' },
-                    }}
-                  />
-                </Stack>
+                <Typography sx={columnHeaderSx}>Customer</Typography>
+                <Typography sx={columnHeaderSx}>Priority</Typography>
+                <Typography sx={columnHeaderSx}>Last Remark</Typography>
+                <Typography sx={columnHeaderSx}>Next Follow-up</Typography>
               </Box>
-            )
-          })
-        )}
+            ) : null}
+
+            {filtered.length === 0 ? (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Typography fontWeight={700} sx={{ mb: 0.5 }}>
+                  {search.trim() || dueFilter !== 'ALL' || dateFrom || dateTo
+                    ? 'No follow-ups match'
+                    : 'No follow-ups due'}
+                </Typography>
+                <Typography color="text.secondary" variant="body2">
+                  {search.trim() || dueFilter !== 'ALL' || dateFrom || dateTo
+                    ? 'Try another filter or clear search.'
+                    : 'When a lead has a next follow-up date, it appears here for the salesperson.'}
+                </Typography>
+              </Box>
+            ) : (
+              filtered.map((lead) => {
+                const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
+                const tone = PRIORITY_TONE[priorityKey]
+                const remark = lastRemark(lead)
+                const next = nextFollowupMeta(lead)
+                const channel = channelForLead(lead)
+                const tel = (lead.mobile || '').replace(/\s+/g, '')
+
+                return (
+                  <Box
+                    key={lead.id}
+                    onClick={() => setDrawerLeadId(lead.id)}
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: gridTemplate,
+                      columnGap: phone ? 1 : 2,
+                      rowGap: 0.85,
+                      alignItems: 'center',
+                      px: 2.25,
+                      py: 1.4,
+                      borderBottom: '1px solid #edf1f7',
+                      cursor: 'pointer',
+                      bgcolor: next.overdue ? '#fffbfb' : 'transparent',
+                      '&:hover': { bgcolor: next.overdue ? '#fff5f5' : '#f8fbff' },
+                      '&:last-child': { borderBottom: 0 },
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
+                      <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
+                        {lead.full_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" noWrap display="block">
+                        {lead.lead_number}
+                        {lead.project_name ? ` · ${lead.project_name}` : ''}
+                      </Typography>
+                      {lead.mobile ? (
+                        <Typography
+                          variant="caption"
+                          component={Link}
+                          href={`tel:${tel}`}
+                          onClick={(event) => event.stopPropagation()}
+                          underline="hover"
+                          noWrap
+                          display="block"
+                          sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content', maxWidth: '100%' }}
+                        >
+                          {lead.mobile}
+                        </Typography>
+                      ) : null}
+                      {phone ? (
+                        <Chip
+                          size="small"
+                          label={PRIORITY_LABEL[priorityKey]}
+                          sx={{
+                            mt: 0.75,
+                            height: 24,
+                            fontWeight: 700,
+                            bgcolor: tone.bg,
+                            color: tone.color,
+                          }}
+                        />
+                      ) : null}
+                    </Box>
+
+                    {!phone ? (
+                      <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center' }}>
+                        <Chip
+                          size="small"
+                          label={PRIORITY_LABEL[priorityKey]}
+                          sx={{
+                            height: 24,
+                            maxWidth: '100%',
+                            fontWeight: 700,
+                            bgcolor: tone.bg,
+                            color: tone.color,
+                          }}
+                        />
+                      </Box>
+                    ) : null}
+
+                    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
+                      {phone ? (
+                        <Typography
+                          variant="caption"
+                          fontWeight={700}
+                          color="text.secondary"
+                          display="block"
+                          sx={{ mb: 0.25 }}
+                        >
+                          Last remark
+                        </Typography>
+                      ) : null}
+                      <Typography fontWeight={600} noWrap title={remark.title} sx={{ color: '#0f172a' }}>
+                        {remark.title}
+                      </Typography>
+                      {remark.detail ? (
+                        <Typography variant="caption" color="text.secondary" noWrap display="block" title={remark.detail}>
+                          {remark.detail}
+                        </Typography>
+                      ) : null}
+                    </Box>
+
+                    <Stack spacing={0.65} sx={{ minWidth: 0, overflow: 'hidden' }}>
+                      {phone ? (
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
+                          Next follow-up
+                        </Typography>
+                      ) : null}
+                      <Typography
+                        variant="body2"
+                        fontWeight={next.overdue || next.today ? 700 : 600}
+                        noWrap
+                        title={next.text}
+                        sx={{ color: next.overdue ? '#b91c1c' : '#0f172a' }}
+                      >
+                        {next.text}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        component={tel && channel === 'call' ? 'a' : 'div'}
+                        href={tel && channel === 'call' ? `tel:${tel}` : undefined}
+                        clickable={Boolean(tel && channel === 'call')}
+                        onClick={(event: MouseEvent) => event.stopPropagation()}
+                        icon={
+                          channel === 'call' ? (
+                            <PhoneOutlinedIcon sx={{ fontSize: '14px !important' }} />
+                          ) : undefined
+                        }
+                        label={channel === 'whatsapp' ? 'WhatsApp' : 'Call'}
+                        sx={{
+                          alignSelf: 'flex-start',
+                          height: 24,
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          bgcolor: '#fce4ec',
+                          color: '#e95d90',
+                          '& .MuiChip-icon': { color: '#e95d90' },
+                        }}
+                      />
+                    </Stack>
+                  </Box>
+                )
+              })
+            )}
+          </Box>
+        </Box>
       </Box>
 
       <Typography variant="caption" color="text.secondary">
