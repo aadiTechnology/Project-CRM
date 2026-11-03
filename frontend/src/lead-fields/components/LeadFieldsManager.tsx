@@ -28,6 +28,7 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -113,6 +114,7 @@ export function LeadFieldsManager({
   const [notice, setNotice] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<LeadField | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<LeadField | null>(null)
   const [form, setForm] = useState<FieldForm>(blankForm())
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -271,6 +273,7 @@ export function LeadFieldsManager({
       setError(requestError instanceof ApiError ? requestError.message : 'Could not delete field.')
     } finally {
       setSaving(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -407,7 +410,13 @@ export function LeadFieldsManager({
                     <IconButton size="small" disabled={saving} onClick={() => openEdit(field)}>
                       <EditOutlinedIcon sx={{ fontSize: 18 }} />
                     </IconButton>
-                    <IconButton size="small" color="error" disabled={saving} onClick={() => void onDelete(field)}>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={saving}
+                      aria-label={`Delete ${field.label}`}
+                      onClick={() => setDeleteTarget(field)}
+                    >
                       <DeleteOutlineIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Stack>
@@ -641,7 +650,7 @@ export function LeadFieldsManager({
                             color="error"
                             disabled={saving}
                             aria-label={`Delete ${field.label}`}
-                            onClick={() => void onDelete(field)}
+                            onClick={() => setDeleteTarget(field)}
                             sx={{ p: 0.5 }}
                           >
                             <DeleteOutlineIcon sx={{ fontSize: 18 }} />
@@ -755,6 +764,17 @@ export function LeadFieldsManager({
           </DialogActions>
         </Box>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget ? `Delete ${deleteTarget.label}?` : 'Delete field?'}
+        description="Leads will stop showing this field and any answers saved in it will be removed."
+        loading={saving}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) void onDelete(deleteTarget)
+        }}
+      />
     </Stack>
   )
 }

@@ -101,6 +101,7 @@ export function RemindersPage() {
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
+  const canDelete = Boolean(user?.permissions.includes('leads.delete'))
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
   const {
     columns: columnDefs,
@@ -978,6 +979,7 @@ export function RemindersPage() {
       <ReminderLeadDrawer
         lead={drawerLead}
         canUpdate={canUpdate}
+        canDelete={canDelete}
         plan={plan}
         onClose={() => setDrawerLeadId(null)}
         onChanged={onDrawerChanged}

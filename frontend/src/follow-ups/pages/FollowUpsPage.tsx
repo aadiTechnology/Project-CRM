@@ -75,6 +75,7 @@ export function FollowUpsPage() {
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const { user } = useAuth()
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
+  const canDelete = Boolean(user?.permissions.includes('leads.delete'))
   const {
     columns: columnDefs,
     visibility: columnVisibility,
@@ -535,6 +536,7 @@ export function FollowUpsPage() {
       <ReminderLeadDrawer
         lead={drawerLead}
         canUpdate={canUpdate}
+        canDelete={canDelete}
         plan={plan}
         onClose={() => setDrawerLeadId(null)}
         onChanged={onDrawerChanged}

@@ -1,11 +1,9 @@
 {
-  "language": "Language",
-  "english": "English",
-  "marathi": "Marathi",
-  "hindi": "Hindi",
   "loading": "Loading",
   "save": "Save",
   "cancel": "Cancel",
+  "delete": "Delete",
+  "deleting": "Deleting…",
   "close": "Close",
   "notFound": "Page not found",
   "notFoundDescription": "The page you requested does not exist.",

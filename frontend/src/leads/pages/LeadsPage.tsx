@@ -142,6 +142,7 @@ export function LeadsPage() {
   const { user } = useAuth()
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
+  const canDelete = Boolean(user?.permissions.includes('leads.delete'))
   const isOwner = Boolean(user?.roles.includes('BUSINESS_OWNER'))
   const isSales = Boolean(user?.roles.includes('SALESPERSON')) && !isOwner
 
@@ -1467,6 +1468,7 @@ export function LeadsPage() {
       <ReminderLeadDrawer
         lead={drawerLead}
         canUpdate={canUpdate}
+        canDelete={canDelete}
         plan={plan}
         onClose={closeLeadDrawer}
         onChanged={onDrawerChanged}

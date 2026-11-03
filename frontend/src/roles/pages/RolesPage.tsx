@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { RolePublic } from '../../auth/types'
 import { roleLabel } from '../../access/role-label'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { messageForError } from '../../auth/validation/errors'
@@ -43,6 +44,7 @@ export function RolesPage() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<RolePublic | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [createName, setCreateName] = useState('')
@@ -138,6 +140,7 @@ export function RolesPage() {
       setError(messageForError(requestError, t))
     } finally {
       setDeletingId(null)
+      setDeleteTarget(null)
     }
   }
 
@@ -278,7 +281,7 @@ export function RolesPage() {
                         size="small"
                         color="error"
                         disabled={deletingId === role.id}
-                        onClick={() => void onDelete(role)}
+                        onClick={() => setDeleteTarget(role)}
                         sx={{ minHeight: 28, px: 1 }}
                       >
                         {t('access:deleteRole')}
@@ -315,6 +318,18 @@ export function RolesPage() {
           </TableBody>
         </Table>
       </Box>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t('access:confirmDeleteRole')}
+        description={deleteTarget ? roleLabel(deleteTarget.name, t) : undefined}
+        confirmLabel={t('access:deleteRole')}
+        loading={deletingId === deleteTarget?.id}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) void onDelete(deleteTarget)
+        }}
+      />
     </Stack>
   )
 }

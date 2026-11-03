@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
 import {
@@ -112,6 +113,7 @@ type LeadActivityItem = {
 type Props = {
   lead: Lead | null
   canUpdate: boolean
+  canDelete?: boolean
   plan: FollowupPlanStep[]
   onClose: () => void
   onChanged: (message: string) => Promise<void>
@@ -124,7 +126,7 @@ function formatActivityAt(value: string) {
   return date.toLocaleDateString('en-CA')
 }
 
-export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }: Props) {
+export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, onClose, onChanged }: Props) {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const open = Boolean(lead)
@@ -137,6 +139,8 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
   const [action, setAction] = useState<ActionKind>(null)
   const [actionNote, setActionNote] = useState('')
   const [customDueDate, setCustomDueDate] = useState(() => isoToDateInput(addDaysIso(null, 1)))
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
 
   const loadActivity = useCallback(async (leadId: string) => {
     try {
@@ -203,6 +207,24 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
   async function saveField(body: Record<string, unknown>) {
     if (!lead || !canUpdate) return
     await patch(body, 'Lead updated.')
+  }
+
+  async function deleteLead() {
+    if (!lead || !canDelete) return
+    const name = lead.full_name
+    setSaving(true)
+    setLocalError('')
+    try {
+      await api.delete(`/api/v1/leads/${lead.id}`)
+      setConfirmDeleteOpen(false)
+      onClose()
+      await onChanged(`Lead deleted · ${name}`)
+    } catch (requestError) {
+      setLocalError(requestError instanceof ApiError ? requestError.message : 'Could not delete lead.')
+      setConfirmDeleteOpen(false)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveCallDone() {
@@ -598,16 +620,31 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
                   </Button>
                 </Stack>
                 {lead.next_followup_at ? (
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 0.75 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Current due {isoToDateInput(lead.next_followup_at)}
+                    </Typography>
+                    <Button
+                      size="small"
+                      color="error"
+                      disabled={saving}
+                      onClick={() => setConfirmClearOpen(true)}
+                      sx={{ minHeight: 24, px: 0.75, fontSize: 12 }}
+                    >
+                      Remove reminder
+                    </Button>
+                  </Stack>
+                ) : (
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                    Current due {isoToDateInput(lead.next_followup_at)}
+                    No reminder set for this lead.
                   </Typography>
-                ) : null}
+                )}
               </Box>
             ) : null}
 
-            {canUpdate ? (
+            {canUpdate || canDelete ? (
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {lead.next_followup_at ? (
+                {canUpdate && lead.next_followup_at ? (
                   <>
                     <Button
                       variant="contained"
@@ -649,7 +686,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
                     </Button>
                   </>
                 ) : null}
-                {!closed ? (
+                {canUpdate && !closed ? (
                   <Button
                     disabled={saving}
                     color="error"
@@ -657,7 +694,8 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
                   >
                     Mark Lost
                   </Button>
-                ) : (
+                ) : null}
+                {canUpdate && closed ? (
                   <Button
                     variant="contained"
                     disabled={saving}
@@ -674,7 +712,17 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
                   >
                     Reopen lead
                   </Button>
-                )}
+                ) : null}
+                {canDelete ? (
+                  <Button
+                    color="error"
+                    disabled={saving}
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    sx={{ ml: 'auto' }}
+                  >
+                    Delete lead
+                  </Button>
+                ) : null}
               </Stack>
             ) : null}
 
@@ -755,6 +803,29 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
           </DialogActions>
         </Box>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={lead ? `Delete ${lead.full_name}?` : 'Delete lead?'}
+        description="This removes the lead, its reminder and all saved call history. It cannot be undone."
+        confirmLabel="Delete lead"
+        loading={saving}
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => void deleteLead()}
+      />
+
+      <ConfirmDialog
+        open={confirmClearOpen}
+        title="Remove this reminder?"
+        description="The lead stays, but it will no longer appear in your reminders until you set a new date."
+        confirmLabel="Remove reminder"
+        loading={saving}
+        onCancel={() => setConfirmClearOpen(false)}
+        onConfirm={() => {
+          setConfirmClearOpen(false)
+          if (lead) void patch({ next_followup_at: null }, `Reminder removed · ${lead.full_name}`)
+        }}
+      />
     </>
   )
 }

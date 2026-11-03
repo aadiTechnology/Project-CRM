@@ -16,6 +16,7 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -556,23 +557,19 @@ export function BusinessesPage() {
         </Box>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onClose={() => (saving ? null : setDeleteTarget(null))} fullWidth maxWidth="xs">
-        <DialogTitle>Delete business?</DialogTitle>
-        <DialogContent>
-          <Typography>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete business?"
+        description={
+          <>
             Delete <strong>{deleteTarget?.name}</strong>? This only works when the business has no users, projects,
             teams, or leads.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteTarget(null)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button color="error" variant="contained" onClick={() => void confirmDelete()} disabled={saving}>
-            {saving ? 'Deleting…' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </>
+        }
+        loading={saving}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </Stack>
   )
 }

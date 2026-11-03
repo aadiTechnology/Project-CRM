@@ -60,6 +60,7 @@
   "permissionsRequired": "Tick at least one permission.",
   "roleCreated": "Role created. Give it to a user in Users.",
   "roleDeleted": "Role deleted.",
+  "confirmDeleteRole": "Delete this role? Users who have it will lose these permissions.",
   "deleteRole": "Delete",
   "yes": "Yes",
   "no": "No",

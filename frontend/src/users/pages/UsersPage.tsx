@@ -35,6 +35,7 @@ import { usePasswordPolicy } from '../../auth/hooks/usePasswordPolicy'
 import { fieldMessages, messageForError } from '../../auth/validation/errors'
 import { isEmail, validatePassword } from '../../auth/validation/password'
 import { roleLabel } from '../../access/role-label'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -617,30 +618,21 @@ export function UsersPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(deleteTarget)} onClose={closeDeleteDialog} aria-labelledby="delete-user-title">
-        <DialogTitle id="delete-user-title">{t('access:confirmDeleteUser')}</DialogTitle>
-        <DialogContent>
-          {deleteTarget ? (
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={t('access:confirmDeleteUser')}
+        description={
+          deleteTarget ? (
             <Typography color="text.secondary">
               {deleteTarget.full_name} · {deleteTarget.email}
             </Typography>
-          ) : null}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault()
-              closeDeleteDialog()
-            }}
-          >
-            {t('common:cancel')}
-          </Button>
-          <Button type="button" color="error" variant="contained" onClick={() => void deleteUser()}>
-            {t('access:deleteUser')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          ) : undefined
+        }
+        confirmLabel={t('access:deleteUser')}
+        loading={Boolean(deleteTarget && busyId === deleteTarget.id)}
+        onCancel={closeDeleteDialog}
+        onConfirm={() => void deleteUser()}
+      />
     </Stack>
   )
 }
