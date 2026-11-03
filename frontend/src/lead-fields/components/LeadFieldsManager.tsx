@@ -1,7 +1,7 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import {
   Box,
@@ -426,7 +426,7 @@ export function LeadFieldsManager({
                       aria-label={`Delete ${field.label}`}
                       onClick={() => setDeleteTarget(field)}
                     >
-                      <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                      <DeleteForeverOutlinedIcon sx={{ fontSize: 18 }} />
                     </IconButton>
                   </Stack>
                 </Stack>
@@ -662,7 +662,7 @@ export function LeadFieldsManager({
                             onClick={() => setDeleteTarget(field)}
                             sx={{ p: 0.5 }}
                           >
-                            <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                            <DeleteForeverOutlinedIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                         </span>
                       </Tooltip>

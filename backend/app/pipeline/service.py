@@ -172,6 +172,26 @@ def assert_stage_key(db: Session, project_id: uuid.UUID | None, status: str) -> 
     return key
 
 
+def is_lost_stage(db: Session, project_id: uuid.UUID | None, status: str) -> bool:
+    """True when status is a lost/unqualified outcome (no further reminders)."""
+    key = canonicalize_status(status)
+    if key in {"lost", "unqualified"}:
+        return True
+    if project_id is None:
+        return False
+    ensure_default_stages(db, project_id)
+    return (
+        db.scalar(
+            select(PipelineStage.id).where(
+                PipelineStage.project_id == project_id,
+                PipelineStage.key == key,
+                PipelineStage.is_lost.is_(True),
+            )
+        )
+        is not None
+    )
+
+
 def _lead_counts(db: Session, project_id: uuid.UUID) -> dict[str, int]:
     rows = db.execute(
         select(Lead.status, func.count())

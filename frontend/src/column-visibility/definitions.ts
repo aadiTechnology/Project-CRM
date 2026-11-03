@@ -30,12 +30,9 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'actions', label: 'Actions', hideable: false, track: '210px' },
   ],
   'follow-ups': [
-    { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(0,1fr)' },
-    { key: 'project', label: 'Project', hideable: true, track: '120px' },
-    { key: 'phone', label: 'Phone', hideable: true, track: '120px' },
-    { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
-    { key: 'due', label: 'Due', hideable: true, track: '110px' },
-    { key: 'actions', label: 'Actions', hideable: false, track: '190px' },
+    { key: 'customer', label: 'Customer', hideable: false, track: 'minmax(220px,1.4fr)' },
+    { key: 'remark', label: 'Last Remark', hideable: false, track: 'minmax(160px,1fr)' },
+    { key: 'next', label: 'Next Follow-up', hideable: false, track: '170px' },
   ],
 }
 

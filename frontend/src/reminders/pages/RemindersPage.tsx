@@ -169,7 +169,7 @@ export function RemindersPage() {
   const load = useCallback(async () => {
     setError('')
     try {
-      const params = new URLSearchParams({ limit: '500' })
+      const params = new URLSearchParams({ limit: '500', exclude_lost: 'true' })
       if (projectId) params.set('project_id', projectId)
       const result = await api.get<LeadList>(`/api/v1/leads?${params}`)
       setLeads(result.data.items)

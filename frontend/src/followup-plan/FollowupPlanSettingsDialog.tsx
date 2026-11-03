@@ -1,5 +1,5 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined'
 import {
   Box,
   Button,
@@ -94,7 +94,7 @@ export function FollowupPlanSettingsDialog({ open, companyId, onClose, onSaved }
                     onClick={() => setSteps(steps.filter((_, i) => i !== index))}
                     sx={{ mt: 0.5 }}
                   >
-                    <DeleteOutlineIcon fontSize="small" />
+                    <DeleteForeverOutlinedIcon fontSize="small" />
                   </IconButton>
                 </Stack>
                 {nextLabel ? (

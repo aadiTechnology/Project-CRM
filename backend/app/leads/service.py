@@ -27,7 +27,8 @@ from app.leads.schemas import (
     normalize_priority,
     normalize_status,
 )
-from app.pipeline.service import assert_stage_key, entry_stage_key
+from app.pipeline.models import PipelineStage
+from app.pipeline.service import assert_stage_key, entry_stage_key, is_lost_stage
 
 _PRIORITY_FILTER_VALUES: dict[str, tuple[str, ...]] = {
     "high": ("high", "Hot"),
@@ -244,6 +245,17 @@ def list_leads(
     if filters.plan_step is not None and filters.plan_step.strip():
         conditions.append(Lead.plan_step == filters.plan_step.strip())
     if filters.exclude_lost:
+        # Classic lost labels plus any pipeline stage marked is_lost for this lead's project.
+        lost_on_project = (
+            select(PipelineStage.id)
+            .where(
+                PipelineStage.project_id == Lead.project_id,
+                PipelineStage.key == Lead.status,
+                PipelineStage.is_lost.is_(True),
+            )
+            .exists()
+        )
+        conditions.append(~lost_on_project)
         conditions.append(Lead.status.notin_(("lost", "Lost", "unqualified")))
     # Salespeople only work leads on projects they are assigned to (plus their own unscoped legacy rows).
     if RoleName.SALESPERSON in {link.role.name for link in actor.user_roles} and RoleName.BUSINESS_OWNER not in {
@@ -450,6 +462,15 @@ def update_lead(
         changed.append("status")
         if lead.status != before_status:
             changes["status"] = {"from": before_status, "to": lead.status}
+        # Lost outcomes should leave the reminder queue (unless caller set a new due explicitly).
+        if is_lost_stage(db, lead.project_id, lead.status) and "next_followup_at" not in fields:
+            if lead.next_followup_at is not None:
+                lead.next_followup_at = None
+                changed.append("next_followup_at")
+                changes["next_followup_at"] = {
+                    "from": None if before_due is None else before_due.isoformat(),
+                    "to": None,
+                }
     if "priority" in fields:
         if payload.priority is None:
             raise _validation("priority", "REQUIRED", "Priority is required.")

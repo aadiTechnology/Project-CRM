@@ -1,37 +1,23 @@
-import CheckIcon from '@mui/icons-material/Check'
-import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined'
-import PhoneMissedOutlinedIcon from '@mui/icons-material/PhoneMissedOutlined'
-import SkipNextOutlinedIcon from '@mui/icons-material/SkipNextOutlined'
-import SnoozeOutlinedIcon from '@mui/icons-material/SnoozeOutlined'
-import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
+import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
 import {
   Box,
+  Button,
   Chip,
-  IconButton,
+  Link,
   MenuItem,
   Stack,
   TextField,
-  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 
-import { ColumnChooser } from '../../column-visibility/ColumnChooser'
-import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
-import { ConfirmDialog } from '../../components/common/ConfirmDialog'
-import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
-import {
-  FollowupPlanStep,
-  gapForStep,
-  loadFollowupPlan,
-  nextPlanStep,
-} from '../../followup-plan/plan'
-import { addDaysIso, followWhen, formatDueLabel } from '../../leads/lead-dates'
+import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
+import { followWhen, formatDueLabel, parseFollowup, type FollowWhen } from '../../leads/lead-dates'
 import {
   Lead,
   LeadList,
@@ -45,23 +31,61 @@ import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
 
-type SessionTally = { connected: number; noAnswer: number; snoozed: number; skipped: number }
+type DueFilter = 'ALL' | FollowWhen
 
-const actionIconSx = {
-  width: 30,
-  height: 30,
-  borderRadius: '8px',
-  color: 'text.secondary',
-  '&:hover': { bgcolor: '#eef2f7', color: 'text.primary' },
-} as const
+/**
+ * Follow-ups ≠ Reminders.
+ * Reminders = today’s call workbench (quick actions).
+ * Follow-ups = who is due next — remark + date + channel; open drawer to act.
+ */
 
-function dueDisplay(lead: Lead) {
-  const when = followWhen(lead.next_followup_at)
-  const label = formatDueLabel(lead.next_followup_at)
-  if (!lead.next_followup_at) return { label: '—', overdue: false, when: null as ReturnType<typeof followWhen> }
-  if (when === 'o') return { label, overdue: true, when }
-  return { label, overdue: false, when }
+function lastRemark(lead: Lead): { title: string; detail?: string } {
+  const fromSummary = (lead.call_summary || '').trim()
+  const fromReq = (lead.requirement || '').trim()
+  const text = fromSummary || fromReq
+  if (!text) return { title: 'No remark yet' }
+
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return { title: 'No remark yet' }
+  if (lines.length === 1) return { title: lines[0] }
+  return { title: lines[lines.length - 1], detail: lines[lines.length - 2] }
 }
+
+function channelForLead(lead: Lead): 'call' | 'whatsapp' {
+  const source = (lead.lead_source || '').toLowerCase()
+  if (source.includes('whatsapp')) return 'whatsapp'
+  return 'call'
+}
+
+function nextFollowupMeta(lead: Lead): {
+  text: string
+  overdue: boolean
+  today: boolean
+  when: FollowWhen | null
+} {
+  const when = followWhen(lead.next_followup_at)
+  const due = parseFollowup(lead.next_followup_at)
+  if (!due || !when) return { text: '—', overdue: false, today: false, when: null }
+
+  const base = formatDueLabel(lead.next_followup_at)
+  if (when === 'o') return { text: `${base} · Overdue`, overdue: true, today: false, when }
+  if (when === 't') {
+    const hasClock = due.getHours() !== 0 || due.getMinutes() !== 0
+    const time = due.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+    return { text: hasClock ? `Today · ${time}` : 'Today', overdue: false, today: true, when }
+  }
+  return { text: base, overdue: false, today: false, when }
+}
+
+const DUE_FILTERS: { id: DueFilter; label: string }[] = [
+  { id: 'ALL', label: 'All' },
+  { id: 'o', label: 'Overdue' },
+  { id: 't', label: 'Today' },
+  { id: 'u', label: 'Upcoming' },
+]
 
 export function FollowUpsPage() {
   const theme = useTheme()
@@ -69,19 +93,6 @@ export function FollowUpsPage() {
   const { user } = useAuth()
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
   const canDelete = Boolean(user?.permissions.includes('leads.delete'))
-  const {
-    columns: columnDefs,
-    visibility: columnVisibility,
-    isVisible: isColumnVisible,
-    toggle: toggleColumn,
-    reset: resetColumns,
-    gridTemplateMd: followUpsGridMd,
-    gridTemplateXs: followUpsGridXs,
-    loadError: columnLoadError,
-    saveError: columnSaveError,
-    clearSaveError: clearColumnSaveError,
-    clearLoadError: clearColumnLoadError,
-  } = useColumnVisibility('follow-ups')
 
   const [items, setItems] = useState<Lead[]>([])
   const [projects, setProjects] = useState<LeadProjectOption[]>([])
@@ -90,13 +101,10 @@ export function FollowUpsPage() {
   const [notice, setNotice] = useState('')
   const [projectId, setProjectId] = useState('')
   const [search, setSearch] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [tally, setTally] = useState<SessionTally>({ connected: 0, noAnswer: 0, snoozed: 0, skipped: 0 })
+  const [dueFilter, setDueFilter] = useState<DueFilter>('ALL')
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null)
-  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setPlan(loadFollowupPlan(user?.company_id))
@@ -104,23 +112,9 @@ export function FollowUpsPage() {
 
   useEffect(() => {
     if (!notice) return
-    const timer = window.setTimeout(() => setNotice(''), 1600)
+    const timer = window.setTimeout(() => setNotice(''), 1800)
     return () => window.clearTimeout(timer)
   }, [notice])
-
-  useEffect(() => {
-    if (columnSaveError) {
-      setError("Couldn't save column preferences on this device. Layout kept; try again.")
-      clearColumnSaveError()
-    }
-  }, [columnSaveError, clearColumnSaveError])
-
-  useEffect(() => {
-    if (columnLoadError) {
-      setError('Column preferences could not be loaded. Showing all columns.')
-      clearColumnLoadError()
-    }
-  }, [columnLoadError, clearColumnLoadError])
 
   useEffect(() => {
     void (async () => {
@@ -139,12 +133,14 @@ export function FollowUpsPage() {
       const params = new URLSearchParams({ limit: '200', exclude_lost: 'true' })
       if (projectId) params.set('project_id', projectId)
       const result = await api.get<LeadList>(`/api/v1/leads?${params}`)
-      const rows = [...result.data.items].sort((a, b) => {
+      // Follow-up list = leads that still have a next date.
+      const withDue = result.data.items.filter((lead) => Boolean(lead.next_followup_at))
+      withDue.sort((a, b) => {
         const aDue = a.next_followup_at ?? '9999'
         const bDue = b.next_followup_at ?? '9999'
         return aDue.localeCompare(bDue)
       })
-      setItems(rows)
+      setItems(withDue)
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Could not load follow-ups.')
     } finally {
@@ -157,23 +153,32 @@ export function FollowUpsPage() {
     void load()
   }, [load])
 
-  const subtitle = useMemo(
-    () =>
-      `Open plans by step. Completed this session: ${tally.connected} connected · ${tally.noAnswer} no answer · ${tally.snoozed} snoozed · ${tally.skipped} skipped.`,
-    [tally],
-  )
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((lead) =>
-      [lead.full_name, lead.mobile, lead.lead_number, lead.requirement, lead.city, lead.project_name, lead.plan_step]
+    return items.filter((lead) => {
+      const when = followWhen(lead.next_followup_at)
+      if (dueFilter !== 'ALL' && when !== dueFilter) return false
+      if (!q) return true
+      return [lead.full_name, lead.mobile, lead.lead_number, lead.requirement, lead.call_summary, lead.city, lead.project_name]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
-        .includes(q),
-    )
-  }, [items, search])
+        .includes(q)
+    })
+  }, [dueFilter, items, search])
+
+  const counts = useMemo(() => {
+    let overdue = 0
+    let today = 0
+    let upcoming = 0
+    for (const lead of items) {
+      const when = followWhen(lead.next_followup_at)
+      if (when === 'o') overdue += 1
+      else if (when === 't') today += 1
+      else if (when === 'u') upcoming += 1
+    }
+    return { overdue, today, upcoming, all: items.length }
+  }, [items])
 
   const drawerLead = useMemo(
     () => (drawerLeadId ? items.find((item) => item.id === drawerLeadId) ?? null : null),
@@ -188,97 +193,51 @@ export function FollowUpsPage() {
     [load],
   )
 
-  function openLead(lead: Lead) {
-    setDrawerLeadId(lead.id)
-  }
-
-  async function patchOutcome(
-    lead: Lead,
-    body: Record<string, unknown>,
-    kind: keyof SessionTally,
-    message: string,
-  ) {
-    setSaving(true)
-    setError('')
-    setNotice('')
-    try {
-      await api.patch(`/api/v1/leads/${lead.id}`, body)
-      setTally((current) => ({ ...current, [kind]: current[kind] + 1 }))
-      setNotice(message)
-      await load()
-    } catch (requestError) {
-      setError(requestError instanceof ApiError ? requestError.message : 'Could not update follow-up.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function onConnected(lead: Lead) {
-    const current = lead.plan_step || plan[0]?.label || 'Day 1'
-    const next = nextPlanStep(plan, current)
-    const target = next?.label ?? current
-    const body: Record<string, unknown> = {
-      next_followup_at: next ? addDaysIso(null, gapForStep(plan, current)) : null,
-      plan_step: target,
-    }
-    if (lead.status === 'new') body.status = 'contacted'
-    const note = 'Connected'
-    body.requirement = lead.requirement ? `${lead.requirement}\n${note}` : note
-    await patchOutcome(lead, body, 'connected', `Connected · ${lead.full_name}`)
-  }
-
-  async function onNoAnswer(lead: Lead) {
-    const note = 'No answer'
-    await patchOutcome(
-      lead,
-      {
-        requirement: lead.requirement ? `${lead.requirement}\n${note}` : note,
-        next_followup_at: addDaysIso(lead.next_followup_at, 1),
-      },
-      'noAnswer',
-      `No answer · ${lead.full_name}`,
-    )
-  }
-
-  async function onSnooze(lead: Lead) {
-    await patchOutcome(
-      lead,
-      { next_followup_at: addDaysIso(lead.next_followup_at, 1) },
-      'snoozed',
-      `Snoozed · ${lead.full_name}`,
-    )
-  }
-
-  async function onSkip(lead: Lead) {
-    await patchOutcome(lead, { next_followup_at: null }, 'skipped', `Skipped · ${lead.full_name}`)
-  }
+  const gridTemplate = phone ? '1fr' : 'minmax(220px,1.4fr) minmax(160px,1fr) 170px'
 
   if (loading && items.length === 0) return <LoadingScreen />
 
   return (
     <Stack spacing={1.25}>
-      <Stack spacing={0.75}>
-        <Typography variant="h1">Follow-ups</Typography>
-        <Typography color="text.secondary" sx={{ maxWidth: 760, lineHeight: 1.55 }}>
-          {subtitle}
-        </Typography>
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="h1">Follow-up List</Typography>
+        </Box>
+        <Chip
+          label={`${filtered.length} Follow-up${filtered.length === 1 ? '' : 's'}`}
+          sx={{
+            fontWeight: 700,
+            bgcolor: counts.overdue > 0 && dueFilter === 'ALL' ? '#fee2e2' : '#dbeafe',
+            color: counts.overdue > 0 && dueFilter === 'ALL' ? '#b91c1c' : '#1d4ed8',
+            height: 28,
+          }}
+        />
       </Stack>
 
       {error ? <ErrorAlert message={error} /> : null}
       {notice ? (
-        <Typography color="success.main" variant="body2" fontWeight={600}>
-          {notice}
-        </Typography>
+        <Box
+          sx={{
+            bgcolor: '#ecfdf5',
+            color: '#047857',
+            border: '1px solid #a7f3d0',
+            borderRadius: '12px',
+            px: 1.75,
+            py: 1.1,
+          }}
+        >
+          <Typography variant="body2">{notice}</Typography>
+        </Box>
       ) : null}
 
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'flex-start' } }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
         <TextField
           size="small"
           label="Search"
-          placeholder="Name, mobile, lead ID…"
+          placeholder="Name, mobile, remark…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          sx={{ width: { xs: '100%', sm: 260 } }}
+          sx={{ width: { xs: '100%', sm: 240 } }}
         />
         <TextField
           select
@@ -286,7 +245,7 @@ export function FollowUpsPage() {
           label="Project"
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
-          sx={{ width: { xs: '100%', sm: 220 } }}
+          sx={{ width: { xs: '100%', sm: 200 } }}
         >
           <MenuItem value="">All projects</MenuItem>
           {projects.map((project) => (
@@ -295,14 +254,43 @@ export function FollowUpsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <Box sx={{ ml: { sm: 'auto' }, alignSelf: { xs: 'flex-end', sm: 'center' } }}>
-          <ColumnChooser
-            columns={columnDefs}
-            visibility={columnVisibility}
-            onToggle={toggleColumn}
-            onReset={resetColumns}
-          />
-        </Box>
+        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ ml: { sm: 'auto' } }}>
+          {DUE_FILTERS.map((item) => {
+            const count =
+              item.id === 'ALL'
+                ? counts.all
+                : item.id === 'o'
+                  ? counts.overdue
+                  : item.id === 't'
+                    ? counts.today
+                    : counts.upcoming
+            const active = dueFilter === item.id
+            return (
+              <Button
+                key={item.id}
+                size="small"
+                variant={active ? 'contained' : 'outlined'}
+                onClick={() => setDueFilter(item.id)}
+                sx={{
+                  minHeight: 32,
+                  px: 1.25,
+                  borderRadius: '999px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  ...(item.id === 'o' && !active
+                    ? { color: '#b91c1c', borderColor: '#fecaca' }
+                    : {}),
+                  ...(item.id === 'o' && active ? { bgcolor: '#b91c1c', '&:hover': { bgcolor: '#991b1b' } } : {}),
+                }}
+              >
+                {item.label}
+                <Box component="span" sx={{ ml: 0.6, opacity: 0.85 }}>
+                  {count}
+                </Box>
+              </Button>
+            )
+          })}
+        </Stack>
       </Stack>
 
       <Box
@@ -319,227 +307,165 @@ export function FollowUpsPage() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: followUpsGridMd,
-              columnGap: 1.25,
+              gridTemplateColumns: gridTemplate,
+              columnGap: 2,
               alignItems: 'center',
-              px: 2,
-              py: 1,
+              px: 2.25,
+              py: 1.15,
               bgcolor: '#f8fafc',
-              borderBottom: '1px solid #dbe3ee',
+              borderBottom: '1px solid #e2e8f0',
             }}
           >
             <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Lead
+              Customer
             </Typography>
-            {isColumnVisible('project') ? (
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Project
-              </Typography>
-            ) : null}
-            {isColumnVisible('phone') ? (
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Phone
-              </Typography>
-            ) : null}
-            {isColumnVisible('priority') ? (
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Priority
-              </Typography>
-            ) : null}
-            {isColumnVisible('due') ? (
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Due
-              </Typography>
-            ) : null}
-            <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
-              Actions
+            <Typography variant="caption" fontWeight={700} color="text.secondary">
+              Last Remark
+            </Typography>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">
+              Next Follow-up
             </Typography>
           </Box>
         ) : null}
 
         {filtered.length === 0 ? (
-          <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-            {search.trim() ? 'No follow-ups match this search.' : 'No open follow-ups in your scope.'}
-          </Typography>
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography fontWeight={700} sx={{ mb: 0.5 }}>
+              {search.trim() || dueFilter !== 'ALL' ? 'No follow-ups match' : 'No follow-ups due'}
+            </Typography>
+            <Typography color="text.secondary" variant="body2">
+              {search.trim() || dueFilter !== 'ALL'
+                ? 'Try another filter or clear search.'
+                : 'When a lead has a next follow-up date, it appears here for the salesperson.'}
+            </Typography>
+          </Box>
         ) : (
           filtered.map((lead) => {
-            const due = dueDisplay(lead)
             const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
+            const tone = PRIORITY_TONE[priorityKey]
+            const remark = lastRemark(lead)
+            const next = nextFollowupMeta(lead)
+            const channel = channelForLead(lead)
+            const tel = (lead.mobile || '').replace(/\s+/g, '')
+
             return (
               <Box
                 key={lead.id}
-                onClick={() => openLead(lead)}
+                onClick={() => setDrawerLeadId(lead.id)}
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: {
-                    xs: followUpsGridXs,
-                    md: followUpsGridMd,
-                  },
-                  columnGap: 1.25,
-                  rowGap: 0.75,
+                  gridTemplateColumns: gridTemplate,
+                  columnGap: { xs: 1, md: 2 },
+                  rowGap: 0.85,
                   alignItems: 'center',
-                  px: 2,
-                  py: 1.15,
+                  px: 2.25,
+                  py: 1.4,
                   borderBottom: '1px solid #edf1f7',
                   cursor: 'pointer',
-                  '&:hover': { bgcolor: '#f8fbff' },
+                  bgcolor: next.overdue ? '#fffbfb' : 'transparent',
+                  '&:hover': { bgcolor: next.overdue ? '#fff5f5' : '#f8fbff' },
                 }}
               >
-                <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', minWidth: 0 }}>
-                  <Box
-                    sx={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: '50%',
-                      flexShrink: 0,
-                      display: 'grid',
-                      placeItems: 'center',
-                      bgcolor: '#fce4ec',
-                      color: '#e95d90',
-                    }}
-                  >
-                    <PhoneInTalkOutlinedIcon sx={{ fontSize: 20 }} />
-                  </Box>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={700} noWrap>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
                       {lead.full_name}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap display="block">
                       {lead.lead_number}
+                      {lead.project_name ? ` · ${lead.project_name}` : ''}
                     </Typography>
+                    {lead.mobile ? (
+                      <Typography
+                        variant="caption"
+                        component={Link}
+                        href={`tel:${tel}`}
+                        onClick={(event) => event.stopPropagation()}
+                        underline="hover"
+                        noWrap
+                        display="block"
+                        sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content' }}
+                      >
+                        {lead.mobile}
+                      </Typography>
+                    ) : null}
                   </Box>
-                </Stack>
-
-                {isColumnVisible('project') ? (
-                  <Typography variant="body2" noWrap sx={{ color: 'text.secondary' }}>
-                    {lead.project_name || '—'}
-                  </Typography>
-                ) : null}
-                {isColumnVisible('phone') ? (
-                  <Typography variant="body2" noWrap sx={{ color: 'primary.main', fontWeight: 600 }}>
-                    {lead.mobile || '—'}
-                  </Typography>
-                ) : null}
-                {isColumnVisible('priority') ? (
                   <Chip
                     size="small"
                     label={PRIORITY_LABEL[priorityKey]}
                     sx={{
-                      justifySelf: 'start',
-                      bgcolor: PRIORITY_TONE[priorityKey].bg,
-                      color: PRIORITY_TONE[priorityKey].color,
-                      fontWeight: 600,
-                      borderRadius: '999px',
+                      flexShrink: 0,
+                      height: 24,
+                      fontWeight: 700,
+                      bgcolor: tone.bg,
+                      color: tone.color,
                     }}
                   />
-                ) : null}
-                {isColumnVisible('due') ? (
-                  <Stack
-                    direction="row"
-                    spacing={0.5}
-                    sx={{
-                      alignItems: 'center',
-                      color: due.overdue ? '#b91c1c' : due.when === 't' ? '#b45309' : '#334155',
-                      fontWeight: due.overdue || due.when === 't' ? 600 : 500,
-                      fontSize: 13,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <TodayOutlinedIcon sx={{ fontSize: 15 }} />
-                    {due.label}
-                  </Stack>
-                ) : null}
+                </Stack>
 
-                {canUpdate ? (
-                  <Stack
-                    direction="row"
-                    spacing={0.25}
-                    sx={{ justifyContent: 'flex-end' }}
-                    onClick={(event) => event.stopPropagation()}
+                <Box sx={{ minWidth: 0 }}>
+                  {phone ? (
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" sx={{ mb: 0.25 }}>
+                      Last remark
+                    </Typography>
+                  ) : null}
+                  <Typography fontWeight={600} noWrap sx={{ color: '#0f172a' }}>
+                    {remark.title}
+                  </Typography>
+                  {remark.detail ? (
+                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                      {remark.detail}
+                    </Typography>
+                  ) : null}
+                </Box>
+
+                <Stack spacing={0.65} sx={{ minWidth: 0 }}>
+                  {phone ? (
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
+                      Next follow-up
+                    </Typography>
+                  ) : null}
+                  <Typography
+                    variant="body2"
+                    fontWeight={next.overdue || next.today ? 700 : 600}
+                    sx={{ color: next.overdue ? '#b91c1c' : '#0f172a' }}
                   >
-                    <Tooltip title="Connected">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={saving}
-                          aria-label={`Connected ${lead.full_name}`}
-                          onClick={() => void onConnected(lead)}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: '8px',
-                            bgcolor: 'primary.main',
-                            color: '#fff',
-                            '&:hover': { bgcolor: 'primary.dark' },
-                          }}
-                        >
-                          <CheckIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="No answer">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={saving}
-                          aria-label={`No answer ${lead.full_name}`}
-                          onClick={() => void onNoAnswer(lead)}
-                          sx={actionIconSx}
-                        >
-                          <PhoneMissedOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Snooze to tomorrow">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={saving}
-                          aria-label={`Snooze ${lead.full_name}`}
-                          onClick={() => void onSnooze(lead)}
-                          sx={actionIconSx}
-                        >
-                          <SnoozeOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    <Tooltip title="Skip">
-                      <span>
-                        <IconButton
-                          size="small"
-                          disabled={saving}
-                          aria-label={`Skip ${lead.full_name}`}
-                          onClick={() => void onSkip(lead)}
-                          sx={actionIconSx}
-                        >
-                          <SkipNextOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    {canDelete ? (
-                      <DeleteIconButton
-                        onClick={() => setDeleteTarget(lead)}
-                        disabled={saving || deleting}
-                        tooltip={`Delete ${lead.full_name}`}
-                      />
-                    ) : null}
-                  </Stack>
-                ) : canDelete ? (
-                  <Box sx={{ justifySelf: 'end' }} onClick={(event) => event.stopPropagation()}>
-                    <DeleteIconButton
-                      onClick={() => setDeleteTarget(lead)}
-                      disabled={deleting}
-                      tooltip={`Delete ${lead.full_name}`}
-                    />
-                  </Box>
-                ) : (
-                  <span />
-                )}
+                    {next.text}
+                  </Typography>
+                  <Chip
+                    size="small"
+                    component={tel && channel === 'call' ? 'a' : 'div'}
+                    href={tel && channel === 'call' ? `tel:${tel}` : undefined}
+                    clickable={Boolean(tel && channel === 'call')}
+                    onClick={(event: MouseEvent) => event.stopPropagation()}
+                    icon={
+                      channel === 'call' ? (
+                        <PhoneOutlinedIcon sx={{ fontSize: '14px !important' }} />
+                      ) : undefined
+                    }
+                    label={channel === 'whatsapp' ? 'WhatsApp' : 'Call'}
+                    sx={{
+                      alignSelf: 'flex-start',
+                      height: 24,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      ...(next.overdue
+                        ? { bgcolor: '#fee2e2', color: '#b91c1c', '& .MuiChip-icon': { color: '#b91c1c' } }
+                        : channel === 'whatsapp'
+                          ? { bgcolor: '#ecfdf5', color: '#047857' }
+                          : { bgcolor: '#dbeafe', color: '#1d4ed8', '& .MuiChip-icon': { color: '#1d4ed8' } }),
+                    }}
+                  />
+                </Stack>
               </Box>
             )
           })
         )}
       </Box>
+
+      <Typography variant="caption" color="text.secondary">
+        Tap a row to open the lead. Use Reminders for quick call outcomes.
+      </Typography>
 
       <ReminderLeadDrawer
         lead={drawerLead}
@@ -556,32 +482,6 @@ export function FollowUpsPage() {
         companyId={user?.company_id}
         onClose={() => setPlanOpen(false)}
         onSaved={setPlan}
-      />
-
-      <ConfirmDialog
-        open={Boolean(deleteTarget)}
-        title={`Delete ${deleteTarget?.full_name}?`}
-        description="This will permanently delete the lead and all its data. This action cannot be undone."
-        confirmLabel="Delete lead"
-        loading={deleting}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={async () => {
-          if (!deleteTarget) return
-          const deletedId = deleteTarget.id
-          const deletedName = deleteTarget.full_name
-          setDeleting(true)
-          try {
-            await api.delete(`/api/v1/leads/${deletedId}`)
-            if (drawerLeadId === deletedId) setDrawerLeadId(null)
-            setDeleteTarget(null)
-            setNotice(`Lead deleted · ${deletedName}`)
-            await load()
-          } catch (err) {
-            setError(err instanceof ApiError ? err.message : 'Could not delete lead.')
-          } finally {
-            setDeleting(false)
-          }
-        }}
       />
     </Stack>
   )

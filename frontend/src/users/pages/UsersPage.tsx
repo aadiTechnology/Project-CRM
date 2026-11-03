@@ -1,5 +1,5 @@
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined'
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
 import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined'
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
@@ -447,7 +447,7 @@ export function UsersPage() {
                               aria-label={t('access:deleteUser')}
                               onClick={() => setDeleteTarget(account)}
                             >
-                              <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                              <DeleteForeverOutlinedIcon sx={{ fontSize: 18 }} />
                             </IconButton>
                           </span>
                         </Tooltip>
