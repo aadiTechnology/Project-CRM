@@ -875,7 +875,10 @@ export function RemindersPage() {
       <Drawer
         anchor={phone ? 'bottom' : 'right'}
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          setAddOpen(false)
+        }}
         PaperProps={{
           sx: {
             width: { xs: '100%', sm: 420 },
@@ -951,7 +954,16 @@ export function RemindersPage() {
         </Box>
       </Drawer>
 
-      <Dialog open={Boolean(rescheduleLead)} onClose={() => setRescheduleLead(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={Boolean(rescheduleLead)}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          setRescheduleLead(null)
+        }}
+        disableEscapeKeyDown
+        fullWidth
+        maxWidth="xs"
+      >
         <Box component="form" onSubmit={(event) => void saveReschedule(event)}>
           <DialogTitle>Reschedule · {rescheduleLead?.full_name}</DialogTitle>
           <DialogContent>

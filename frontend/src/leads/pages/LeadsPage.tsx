@@ -465,7 +465,11 @@ export function LeadsPage() {
     const next: Record<string, string> = {}
     if (!form.project_id) next.project_id = 'Choose which project this lead belongs to.'
     if (form.full_name.trim().length < 2) next.full_name = 'Enter the lead name.'
-    if (!form.mobile.trim()) next.mobile = 'Enter a mobile number.'
+    const mobileDigits = form.mobile.replace(/\D+/g, '')
+    if (!mobileDigits) next.mobile = 'Enter a mobile number.'
+    else if (mobileDigits.length !== 10 && mobileDigits.length !== 12) {
+      next.mobile = 'Mobile number must be 10 or 12 digits.'
+    }
     if (!form.lead_source) next.lead_source = 'Choose a source.'
     if (!form.city.trim()) next.city = 'Enter a city.'
     if (!form.enquiry_date.trim()) next.enquiry_date = 'Choose the enquiry date.'
@@ -496,7 +500,7 @@ export function LeadsPage() {
     return {
       project_id: form.project_id || null,
       full_name: form.full_name.trim(),
-      mobile: form.mobile.trim(),
+      mobile: form.mobile.replace(/\D+/g, ''),
       email: form.email.trim() || null,
       city: form.city.trim() || null,
       lead_source: form.lead_source || null,
@@ -595,8 +599,19 @@ export function LeadsPage() {
             fullWidth
             disabled={disabled}
             error={Boolean(fieldErrors.mobile)}
-            helperText={fieldErrors.mobile}
-            onChange={(event) => setForm((current) => ({ ...current, mobile: event.target.value }))}
+            helperText={fieldErrors.mobile || '10 or 12 digits only'}
+            inputProps={{ inputMode: 'numeric', maxLength: 12, pattern: '[0-9]*' }}
+            onChange={(event) => {
+              const digits = event.target.value.replace(/\D+/g, '').slice(0, 12)
+              setForm((current) => ({ ...current, mobile: digits }))
+              if (fieldErrors.mobile) {
+                setFieldErrors((current) => {
+                  const next = { ...current }
+                  delete next.mobile
+                  return next
+                })
+              }
+            }}
           />
           <TextField
             label="Email"
@@ -1265,7 +1280,11 @@ export function LeadsPage() {
 
       <Dialog
         open={importOpen}
-        onClose={closeImportDialog}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          closeImportDialog()
+        }}
+        disableEscapeKeyDown
         fullScreen={phone}
         fullWidth
         maxWidth="xs"
@@ -1423,7 +1442,10 @@ export function LeadsPage() {
       <Drawer
         anchor="right"
         open={createOpen}
-        onClose={closeCreateDialog}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          closeCreateDialog()
+        }}
         PaperProps={{
           sx: {
             width: { xs: '100%', sm: 480, md: 520 },
@@ -1552,7 +1574,10 @@ export function LeadsPage() {
       <Drawer
         anchor="right"
         open={fieldsDrawerOpen}
-        onClose={closeFieldsDrawer}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          closeFieldsDrawer()
+        }}
         PaperProps={{
           sx: {
             width: { xs: '100%', sm: 560, md: 720 },

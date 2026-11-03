@@ -62,6 +62,7 @@ export function KpisPage() {
       try {
         const result = await api.get<{ items: LeadProjectOption[] }>('/api/v1/projects')
         setProjects(result.data.items)
+        setProjectId((current) => current || result.data.items[0]?.id || '')
       } catch {
         setProjects([])
       }
@@ -104,11 +105,13 @@ export function KpisPage() {
           select
           size="small"
           label="Project"
+          required
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
+          disabled={projects.length === 0}
           sx={{ minWidth: { xs: '100%', sm: 260 }, flexShrink: 0 }}
         >
-          <MenuItem value="">All projects</MenuItem>
+          {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
               {project.name}

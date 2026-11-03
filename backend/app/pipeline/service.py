@@ -192,6 +192,31 @@ def is_lost_stage(db: Session, project_id: uuid.UUID | None, status: str) -> boo
     )
 
 
+def is_won_stage(db: Session, project_id: uuid.UUID | None, status: str) -> bool:
+    """True when status is a won/closed-won outcome (no further reminders)."""
+    key = canonicalize_status(status)
+    if key == "won":
+        return True
+    if project_id is None:
+        return False
+    ensure_default_stages(db, project_id)
+    return (
+        db.scalar(
+            select(PipelineStage.id).where(
+                PipelineStage.project_id == project_id,
+                PipelineStage.key == key,
+                PipelineStage.is_won.is_(True),
+            )
+        )
+        is not None
+    )
+
+
+def is_closed_stage(db: Session, project_id: uuid.UUID | None, status: str) -> bool:
+    """Lost or won — should leave the reminder queue until reopened with a due date."""
+    return is_lost_stage(db, project_id, status) or is_won_stage(db, project_id, status)
+
+
 def _lead_counts(db: Session, project_id: uuid.UUID) -> dict[str, int]:
     rows = db.execute(
         select(Lead.status, func.count())

@@ -1,5 +1,6 @@
 """Lead request and response schemas."""
 
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -112,10 +113,18 @@ class CreateLeadRequest(BaseModel):
             return None
         return _optional_text(_collapse(value))
 
-    @field_validator("address", "requirement", "alternate_mobile", "mobile", "call_summary")
+    @field_validator("address", "requirement", "alternate_mobile", "call_summary")
     @classmethod
     def clean_free_text(cls, value: str | None) -> str | None:
         return _optional_text(value)
+
+    @field_validator("mobile")
+    @classmethod
+    def clean_mobile(cls, value: str) -> str:
+        digits = re.sub(r"\D+", "", value or "")
+        if len(digits) not in (10, 12):
+            raise ValueError("Mobile number must be 10 or 12 digits.")
+        return digits
 
 
 class UpdateLeadRequest(BaseModel):

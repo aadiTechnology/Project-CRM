@@ -240,7 +240,10 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
       <Drawer
         anchor={phone ? 'bottom' : 'right'}
         open={open}
-        onClose={onClose}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          onClose()
+        }}
         PaperProps={{
           sx: {
             width: { xs: '100%', sm: 520 },
@@ -651,7 +654,16 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
         ) : null}
       </Drawer>
 
-      <Dialog open={Boolean(action)} onClose={() => !saving && setAction(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={Boolean(action)}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          if (!saving) setAction(null)
+        }}
+        disableEscapeKeyDown
+        fullWidth
+        maxWidth="xs"
+      >
         <Box component="form" onSubmit={(event) => void submitAction(event)}>
           <DialogTitle>
             {actionTitle}

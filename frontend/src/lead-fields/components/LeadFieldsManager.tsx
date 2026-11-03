@@ -685,7 +685,11 @@ export function LeadFieldsManager({
 
       <Dialog
         open={dialogOpen}
-        onClose={() => !saving && setDialogOpen(false)}
+        onClose={(_event, reason) => {
+          if (reason === 'backdropClick' || reason === 'escapeKeyDown') return
+          if (!saving) setDialogOpen(false)
+        }}
+        disableEscapeKeyDown
         fullWidth
         maxWidth="xs"
         PaperProps={{
