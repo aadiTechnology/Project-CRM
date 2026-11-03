@@ -103,6 +103,8 @@ export function FollowUpsPage() {
   const [projectId, setProjectId] = useState('')
   const [search, setSearch] = useState('')
   const [dueFilter, setDueFilter] = useState<DueFilter>('ALL')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
@@ -155,9 +157,30 @@ export function FollowUpsPage() {
     void load()
   }, [load])
 
+  const inDateRange = useCallback(
+    (lead: Lead) => {
+      if (!dateFrom && !dateTo) return true
+      const due = parseFollowup(lead.next_followup_at)
+      if (!due) return false
+      const day = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+      if (dateFrom) {
+        const from = new Date(`${dateFrom}T00:00:00`).getTime()
+        if (!Number.isNaN(from) && day < from) return false
+      }
+      if (dateTo) {
+        const to = new Date(`${dateTo}T00:00:00`).getTime()
+        if (!Number.isNaN(to) && day > to) return false
+      }
+      return true
+    },
+    [dateFrom, dateTo],
+  )
+
+  const rangedItems = useMemo(() => items.filter(inDateRange), [inDateRange, items])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return items.filter((lead) => {
+    return rangedItems.filter((lead) => {
       const when = followWhen(lead.next_followup_at)
       if (dueFilter !== 'ALL' && when !== dueFilter) return false
       if (!q) return true
@@ -167,20 +190,20 @@ export function FollowUpsPage() {
         .toLowerCase()
         .includes(q)
     })
-  }, [dueFilter, items, search])
+  }, [dueFilter, rangedItems, search])
 
   const counts = useMemo(() => {
     let overdue = 0
     let today = 0
     let upcoming = 0
-    for (const lead of items) {
+    for (const lead of rangedItems) {
       const when = followWhen(lead.next_followup_at)
       if (when === 'o') overdue += 1
       else if (when === 't') today += 1
       else if (when === 'u') upcoming += 1
     }
-    return { overdue, today, upcoming, all: items.length }
-  }, [items])
+    return { overdue, today, upcoming, all: rangedItems.length }
+  }, [rangedItems])
 
   const drawerLead = useMemo(
     () => (drawerLeadId ? items.find((item) => item.id === drawerLeadId) ?? null : null),
@@ -257,9 +280,44 @@ export function FollowUpsPage() {
           placeholder="Search name, mobile, remark…"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          sx={{ width: { xs: '100%', sm: 260 } }}
+          sx={{ width: { xs: '100%', sm: 220 } }}
           disabled={!projectId}
         />
+        <TextField
+          size="small"
+          label="From"
+          type="date"
+          value={dateFrom}
+          disabled={!projectId}
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ max: dateTo || undefined }}
+          onChange={(event) => setDateFrom(event.target.value)}
+          sx={{ width: { xs: '100%', sm: 150 } }}
+        />
+        <TextField
+          size="small"
+          label="To"
+          type="date"
+          value={dateTo}
+          disabled={!projectId}
+          InputLabelProps={{ shrink: true }}
+          inputProps={{ min: dateFrom || undefined }}
+          onChange={(event) => setDateTo(event.target.value)}
+          sx={{ width: { xs: '100%', sm: 150 } }}
+        />
+        {dateFrom || dateTo ? (
+          <Button
+            size="small"
+            disabled={!projectId}
+            onClick={() => {
+              setDateFrom('')
+              setDateTo('')
+            }}
+            sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, flexShrink: 0 }}
+          >
+            Clear dates
+          </Button>
+        ) : null}
         <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ ml: { sm: 'auto' } }}>
           {DUE_FILTERS.map((item) => {
             const count =
