@@ -69,6 +69,9 @@ _COMMON_ALIASES: dict[str, str] = {
     "lead status": "status",
     "status": "status",
     "converted": "status",
+    "enquiry date": "enquiry_date",
+    "enquiry": "enquiry_date",
+    "call summary": "call_summary",
     "next follow-up": "next_followup_at",
     "next follow up": "next_followup_at",
     "follow-up date": "next_followup_at",
@@ -77,7 +80,6 @@ _COMMON_ALIASES: dict[str, str] = {
 
 _NOTE_ALIASES = frozenset(
     {
-        "call summary",
         "follow-up",
         "follow up",
         "follow-up notes",
@@ -127,8 +129,6 @@ def _is_note_header(header: str) -> bool:
     if header.startswith("next follow"):
         return False
     if header in _NOTE_ALIASES:
-        return True
-    if header.startswith("call summary"):
         return True
     if header.startswith("followup comment") or header.startswith("follow-up comment"):
         return True
@@ -453,18 +453,22 @@ def import_leads_from_excel(
             if notes_key:
                 extras[notes_key] = merged
             else:
-                existing_req = _cell_text(values.get("requirement")) or ""
-                values["requirement"] = f"{existing_req}\n\n{merged}".strip() if existing_req else merged
+                existing_summary = _cell_text(values.get("call_summary")) or ""
+                values["call_summary"] = (
+                    f"{existing_summary}\n\n{merged}".strip() if existing_summary else merged
+                )
 
         priority = _map_priority(values.get("priority"))
         status_raw = _map_status_raw(values.get("status"))
         follow_at = _parse_datetime(values.get("next_followup_at")) or _default_followup()
+        enquiry_at = _parse_datetime(values.get("enquiry_date"))
         expected = _parse_decimal(values.get("expected_value"))
         email = _cell_text(values.get("email"))
         city = _cell_text(values.get("city"))
         company_name = _cell_text(values.get("company_name"))
         requirement = _cell_text(values.get("requirement"))
         lead_source = _cell_text(values.get("lead_source"))
+        call_summary = _cell_text(values.get("call_summary"))
 
         # Resolve status against pipeline; fall back to entry stage.
         status_for_create: str | None = None
@@ -483,6 +487,8 @@ def import_leads_from_excel(
                 city=city,
                 requirement=requirement,
                 expected_value=expected,
+                enquiry_date=enquiry_at.date() if enquiry_at else None,
+                call_summary=call_summary,
                 lead_source=lead_source,
                 project_id=project_id,
                 status=status_for_create,
