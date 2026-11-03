@@ -1,3 +1,4 @@
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import {
   Alert,
   Box,
@@ -7,19 +8,23 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
+import { useAuth } from '../../store/auth-context'
 
 interface CompanyOption {
   id: string
@@ -57,14 +62,20 @@ function codeIsValid(code: string) {
 export function ProjectsPage() {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('sm'))
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const canOpenLeads = Boolean(user?.roles.some((role) => role === 'BUSINESS_OWNER' || role === 'SALESPERSON'))
   const [data, setData] = useState<ProjectList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [saving, setSaving] = useState(false)
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<ProjectItem | null>(null)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+  const [status, setStatus] = useState('active')
   const [companyId, setCompanyId] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
@@ -87,10 +98,37 @@ export function ProjectsPage() {
 
   const selectedCompany = data?.companies.find((company) => company.id === companyId)
   const duplicate = useMemo(
-    () => Boolean(data?.items.some((project) => project.company_id === companyId && project.code === code)),
-    [code, companyId, data?.items],
+    () =>
+      !editing &&
+      Boolean(data?.items.some((project) => project.company_id === companyId && project.code === code)),
+    [code, companyId, data?.items, editing],
   )
   const preview = codeIsValid(code) ? `${code}-0001` : 'Enter a short code'
+
+  function resetForm() {
+    setEditing(null)
+    setName('')
+    setCode('')
+    setDescription('')
+    setStatus('active')
+    setFieldErrors({})
+  }
+
+  function openCreate() {
+    resetForm()
+    setOpen(true)
+  }
+
+  function openEdit(project: ProjectItem) {
+    setEditing(project)
+    setName(project.name)
+    setCode(project.code)
+    setDescription(project.description)
+    setStatus(project.status === 'inactive' ? 'inactive' : 'active')
+    setCompanyId(project.company_id)
+    setFieldErrors({})
+    setOpen(true)
+  }
 
   function closeForm() {
     if (saving) return
@@ -102,25 +140,33 @@ export function ProjectsPage() {
     event.preventDefault()
     const next: Record<string, string> = {}
     if (name.trim().length < 2) next.name = 'Project name must be at least 2 characters.'
-    if (!codeIsValid(code)) next.code = 'Use 2 to 12 letters, numbers, or hyphens, starting with a letter.'
-    else if (duplicate) next.code = 'This business already has a project with that short code.'
-    if (!companyId) next.company_id = 'Choose a business.'
+    if (editing) {
+      if (description.trim().length > 500) next.description = 'Description must be 500 characters or fewer.'
+    } else {
+      if (!codeIsValid(code)) next.code = 'Use 2 to 12 letters, numbers, or hyphens, starting with a letter.'
+      else if (duplicate) next.code = 'This business already has a project with that short code.'
+      if (!companyId) next.company_id = 'Choose a business.'
+    }
     setFieldErrors(next)
     if (Object.keys(next).length > 0) return
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const result = await api.post<ProjectList>('/api/v1/projects', {
-        name: name.trim(),
-        code,
-        company_id: companyId,
-        template: 'GENERIC',
-      })
+      const result = editing
+        ? await api.patch<ProjectList>(`/api/v1/projects/${editing.id}`, {
+            name: name.trim(),
+            description: description.trim(),
+            status,
+          })
+        : await api.post<ProjectList>('/api/v1/projects', {
+            name: name.trim(),
+            code,
+            company_id: companyId,
+            template: 'GENERIC',
+          })
       setData(result.data)
-      setName('')
-      setCode('')
-      setFieldErrors({})
+      resetForm()
       setOpen(false)
       setNotice(result.message)
     } catch (requestError) {
@@ -148,7 +194,7 @@ export function ProjectsPage() {
           Projects
         </Typography>
         {data?.can_create ? (
-          <Button variant="contained" onClick={() => setOpen(true)} sx={{ flexShrink: 0 }}>
+          <Button variant="contained" onClick={openCreate} sx={{ flexShrink: 0 }}>
             Create project
           </Button>
         ) : null}
@@ -211,6 +257,25 @@ export function ProjectsPage() {
             <Typography variant="body2" sx={{ mt: 1.5 }}>
               {project.lead_count} {project.lead_count === 1 ? 'lead' : 'leads'} · Next {project.next_lead_number}
             </Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center', justifyContent: 'flex-end' }}>
+              {canOpenLeads ? (
+                <Button size="small" variant="outlined" onClick={() => navigate(`/app/leads?project=${project.id}`)}>
+                  Open leads
+                </Button>
+              ) : null}
+              {data.can_create ? (
+                <Tooltip title="Edit project">
+                  <IconButton
+                    size="small"
+                    aria-label={`Edit ${project.name}`}
+                    onClick={() => openEdit(project)}
+                    sx={{ border: '1px solid', borderColor: 'divider' }}
+                  >
+                    <EditOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+            </Stack>
           </Box>
         ))}
       </Box>
@@ -221,14 +286,16 @@ export function ProjectsPage() {
         fullScreen={phone}
         fullWidth
         maxWidth="sm"
-        aria-labelledby="create-project-title"
+        aria-labelledby="project-form-title"
       >
         <Box component="form" onSubmit={(event) => void onSubmit(event)} sx={{ display: 'flex', flexDirection: 'column', minHeight: phone ? '100%' : undefined }}>
-          <DialogTitle id="create-project-title">Create project</DialogTitle>
+          <DialogTitle id="project-form-title">{editing ? 'Edit project' : 'Create project'}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} sx={{ pt: 0.5 }}>
               <Typography color="text.secondary">
-                Pick the business first. Creating the project assigns it to that business owner automatically.
+                {editing
+                  ? 'Rename the project, update the description, or mark it inactive. The short code stays the same because lead numbers already use it.'
+                  : 'Pick the business first. Creating the project assigns it to that business owner automatically.'}
               </Typography>
               <TextField
                 id="project-name"
@@ -252,10 +319,40 @@ export function ProjectsPage() {
                 placeholder="PRESCHOOL"
                 error={Boolean(fieldErrors.code)}
                 helperText={fieldErrors.code || 'Used in the lead number. Letters, numbers, and hyphens.'}
-                disabled={saving}
+                disabled={saving || Boolean(editing)}
                 slotProps={{ htmlInput: { maxLength: 12, style: { textTransform: 'uppercase' } } }}
                 onChange={(event) => setCode(cleanCode(event.target.value))}
               />
+              {editing ? (
+                <>
+                  <TextField
+                    id="project-description"
+                    label="Description"
+                    value={description}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    error={Boolean(fieldErrors.description)}
+                    helperText={fieldErrors.description || 'Shown on the project card.'}
+                    disabled={saving}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                  <TextField
+                    id="project-status"
+                    select
+                    label="Status"
+                    value={status}
+                    required
+                    fullWidth
+                    disabled={saving}
+                    helperText="Inactive projects stay off Leads, Pipeline, and Team until you turn them back on."
+                    onChange={(event) => setStatus(event.target.value)}
+                  >
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="inactive">Inactive</MenuItem>
+                  </TextField>
+                </>
+              ) : null}
               <TextField
                 id="project-business"
                 select
@@ -265,7 +362,7 @@ export function ProjectsPage() {
                 fullWidth
                 error={Boolean(fieldErrors.company_id)}
                 helperText={fieldErrors.company_id || 'The Business Owner of this organisation will see the project.'}
-                disabled={saving || !data || data.companies.length === 0}
+                disabled={saving || Boolean(editing) || !data || data.companies.length === 0}
                 onChange={(event) => setCompanyId(event.target.value)}
               >
                 {(data?.companies ?? []).map((company) => (
@@ -274,6 +371,7 @@ export function ProjectsPage() {
                   </MenuItem>
                 ))}
               </TextField>
+              {editing ? null : (
               <Box
                 sx={{
                   p: 1.5,
@@ -295,14 +393,20 @@ export function ProjectsPage() {
                   </Typography>
                 ) : null}
               </Box>
+              )}
             </Stack>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2, flexDirection: { xs: 'column-reverse', sm: 'row' }, gap: 1 }}>
             <Button type="button" onClick={closeForm} disabled={saving} fullWidth={phone}>
               Cancel
             </Button>
-            <Button type="submit" variant="contained" disabled={saving || !data || data.companies.length === 0} fullWidth={phone}>
-              {saving ? 'Creating…' : 'Create project'}
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving || !data || (!editing && data.companies.length === 0)}
+              fullWidth={phone}
+            >
+              {saving ? 'Saving…' : editing ? 'Save project' : 'Create project'}
             </Button>
           </DialogActions>
         </Box>

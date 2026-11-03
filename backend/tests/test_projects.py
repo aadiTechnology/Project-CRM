@@ -108,3 +108,53 @@ async def test_super_admin_creates_a_project_and_owner_can_see_it(client):
     assert listed_rep.status_code == 200
     assert listed_rep.json()["data"]["items"] == []
     assert listed_rep.json()["data"]["can_create"] is False
+
+
+async def test_super_admin_edits_a_project_and_owner_cannot(client):
+    company_id = _add_company("North Campus")
+    _add_member("editor@example.com", "SUPER_ADMIN")
+    _add_member("campus-owner@example.com", "BUSINESS_OWNER", company_id)
+
+    assert (await login(client, email="editor@example.com")).status_code == 200
+    created = await client.post(
+        "/api/v1/projects",
+        json={"name": "Admissions", "code": "ADMIT", "company_id": str(company_id), "template": "GENERIC"},
+        headers=await csrf_headers(client),
+    )
+    assert created.status_code == 200, created.text
+    project_id = next(item["id"] for item in created.json()["data"]["items"] if item["code"] == "ADMIT")
+
+    updated = await client.patch(
+        f"/api/v1/projects/{project_id}",
+        json={"name": "Admissions 2026", "description": "Autumn intake", "status": "inactive"},
+        headers=await csrf_headers(client),
+    )
+    assert updated.status_code == 200, updated.text
+    item = next(project for project in updated.json()["data"]["items"] if project["id"] == project_id)
+    assert item["name"] == "Admissions 2026"
+    assert item["description"] == "Autumn intake"
+    assert item["status"] == "inactive"
+    assert item["code"] == "ADMIT"
+    assert updated.json()["message"] == "Admissions 2026 is updated."
+
+    assert (await login(client, email="campus-owner@example.com")).status_code == 200
+    hidden = await client.get("/api/v1/projects")
+    assert hidden.status_code == 200
+    assert hidden.json()["data"]["items"] == []
+    blocked = await client.patch(
+        f"/api/v1/projects/{project_id}",
+        json={"name": "Nope", "description": "", "status": "active"},
+        headers=await csrf_headers(client),
+    )
+    assert blocked.status_code == 403
+
+    assert (await login(client, email="editor@example.com")).status_code == 200
+    restored = await client.patch(
+        f"/api/v1/projects/{project_id}",
+        json={"name": "Admissions 2026", "description": "Autumn intake", "status": "active"},
+        headers=await csrf_headers(client),
+    )
+    assert restored.status_code == 200, restored.text
+    assert (await login(client, email="campus-owner@example.com")).status_code == 200
+    visible = await client.get("/api/v1/projects")
+    assert [project["code"] for project in visible.json()["data"]["items"]] == ["ADMIT"]

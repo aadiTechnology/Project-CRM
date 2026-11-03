@@ -13,6 +13,13 @@ def _collapse(value: str) -> str:
     return " ".join(value.split())
 
 
+def _clean_name(value: str) -> str:
+    cleaned = _collapse(value)
+    if len(cleaned) < 2:
+        raise ValueError("Project name must be at least 2 characters.")
+    return cleaned
+
+
 class CreateProjectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,10 +31,7 @@ class CreateProjectRequest(BaseModel):
     @field_validator("name")
     @classmethod
     def clean_name(cls, value: str) -> str:
-        cleaned = _collapse(value)
-        if len(cleaned) < 2:
-            raise ValueError("Project name must be at least 2 characters.")
-        return cleaned
+        return _clean_name(value)
 
     @field_validator("code")
     @classmethod
@@ -38,6 +42,24 @@ class CreateProjectRequest(BaseModel):
         if "--" in cleaned or cleaned.endswith("-"):
             raise ValueError("Use 2 to 12 letters, numbers, or hyphens, starting with a letter.")
         return cleaned
+
+
+class UpdateProjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=500)
+    status: Literal["active", "inactive"]
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        return _clean_name(value)
+
+    @field_validator("description")
+    @classmethod
+    def clean_description(cls, value: str) -> str:
+        return _collapse(value)
 
 
 class CompanyOption(BaseModel):

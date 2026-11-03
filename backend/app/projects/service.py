@@ -1,4 +1,4 @@
-"""Create and list projects. A lead number starts from the project short code."""
+"""Create, update, and list projects. A lead number starts from the project short code."""
 
 import uuid
 from datetime import UTC, datetime
@@ -11,7 +11,7 @@ from app.audit.service import record_audit
 from app.common.exceptions import AppError, ErrorCode
 from app.leads.models import Lead
 from app.organization.models import ACTIVE, Company, Project
-from app.projects.schemas import TEMPLATES, CreateProjectRequest, ProjectPublic
+from app.projects.schemas import TEMPLATES, CreateProjectRequest, ProjectPublic, UpdateProjectRequest
 from app.roles.service import RoleName
 from app.team.service import ensure_project_owners, project_ids_for_member
 from app.users.models import User
@@ -75,9 +75,10 @@ def _to_public(project: Project, company_name: str, lead_count: int) -> ProjectP
 def list_projects(db: Session, actor: User) -> tuple[list[ProjectPublic], list[Company]]:
     _require_viewer(actor)
     roles = _role_names(actor)
-    stmt = select(Project, Company.name).join(Company, Company.id == Project.company_id).where(
-        Project.status == ACTIVE
-    )
+    stmt = select(Project, Company.name).join(Company, Company.id == Project.company_id)
+    # Super Admin keeps inactive projects so they can be edited back to active.
+    if not can_create_projects(actor):
+        stmt = stmt.where(Project.status == ACTIVE)
 
     if can_create_projects(actor):
         pass
@@ -159,3 +160,40 @@ def create_project(
     db.commit()
     db.refresh(project)
     return _to_public(project, company.name, 0)
+
+
+def update_project(
+    db: Session,
+    actor: User,
+    project_id: uuid.UUID,
+    payload: UpdateProjectRequest,
+    ip_address: str | None,
+) -> ProjectPublic:
+    if not can_create_projects(actor):
+        raise _forbidden()
+    project = db.get(Project, project_id)
+    if project is None:
+        raise AppError(ErrorCode.NOT_FOUND, "Project not found.", 404)
+    company = db.get(Company, project.company_id)
+    if company is None:
+        raise AppError(ErrorCode.NOT_FOUND, "Project not found.", 404)
+    before = {"name": project.name, "description": project.description, "status": project.status}
+    project.name = payload.name
+    project.description = payload.description
+    project.status = payload.status
+    project.updated_at = datetime.now(UTC)
+    lead_count = db.scalar(
+        select(func.count()).select_from(Lead).where(Lead.project_id == project.id, Lead.is_deleted.is_(False))
+    ) or 0
+    record_audit(
+        db,
+        action="project_updated",
+        actor_id=actor.id,
+        target_type="project",
+        target_id=project.id,
+        context={"before": before, "after": {"name": project.name, "description": project.description, "status": project.status}},
+        ip_address=ip_address,
+    )
+    db.commit()
+    db.refresh(project)
+    return _to_public(project, company.name, int(lead_count))
