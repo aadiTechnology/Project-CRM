@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'reac
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { resolveCallSummary } from '../../lead-fields/builtinLabels'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
 import { followWhen, formatDueLabel, parseFollowup, type FollowWhen } from '../../leads/lead-dates'
@@ -40,14 +41,14 @@ type DueFilter = 'ALL' | FollowWhen
  */
 
 function lastRemark(lead: Lead): { title: string; detail?: string } {
-  const fromSummary = (lead.call_summary || '').trim()
+  const fromSummary = resolveCallSummary(lead.call_summary, lead.extra_values)
   const fromReq = (lead.requirement || '').trim()
   const text = fromSummary || fromReq
   if (!text) return { title: 'No remark yet' }
 
   const lines = text
     .split(/\n+/)
-    .map((line) => line.trim())
+    .map((line: string) => line.trim())
     .filter(Boolean)
   if (lines.length === 0) return { title: 'No remark yet' }
   if (lines.length === 1) return { title: lines[0] }
@@ -194,7 +195,9 @@ export function FollowUpsPage() {
     [load],
   )
 
-  const gridTemplate = phone ? '1fr' : 'minmax(220px,1.4fr) minmax(160px,1fr) 170px'
+  const gridTemplate = phone
+    ? '1fr'
+    : 'minmax(200px,1.35fr) 88px minmax(150px,1fr) 170px'
 
   if (loading && items.length === 0) return <LoadingScreen />
 
@@ -323,6 +326,9 @@ export function FollowUpsPage() {
               Customer
             </Typography>
             <Typography variant="caption" fontWeight={700} color="text.secondary">
+              Priority
+            </Typography>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">
               Last Remark
             </Typography>
             <Typography variant="caption" fontWeight={700} color="text.secondary">
@@ -369,42 +375,57 @@ export function FollowUpsPage() {
                   '&:hover': { bgcolor: next.overdue ? '#fff5f5' : '#f8fbff' },
                 }}
               >
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
-                      {lead.full_name}
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
+                    {lead.full_name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap display="block">
+                    {lead.lead_number}
+                    {lead.project_name ? ` · ${lead.project_name}` : ''}
+                  </Typography>
+                  {lead.mobile ? (
+                    <Typography
+                      variant="caption"
+                      component={Link}
+                      href={`tel:${tel}`}
+                      onClick={(event) => event.stopPropagation()}
+                      underline="hover"
+                      noWrap
+                      display="block"
+                      sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content' }}
+                    >
+                      {lead.mobile}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
-                      {lead.lead_number}
-                      {lead.project_name ? ` · ${lead.project_name}` : ''}
-                    </Typography>
-                    {lead.mobile ? (
-                      <Typography
-                        variant="caption"
-                        component={Link}
-                        href={`tel:${tel}`}
-                        onClick={(event) => event.stopPropagation()}
-                        underline="hover"
-                        noWrap
-                        display="block"
-                        sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content' }}
-                      >
-                        {lead.mobile}
-                      </Typography>
-                    ) : null}
+                  ) : null}
+                  {phone ? (
+                    <Chip
+                      size="small"
+                      label={PRIORITY_LABEL[priorityKey]}
+                      sx={{
+                        mt: 0.75,
+                        height: 24,
+                        fontWeight: 700,
+                        bgcolor: tone.bg,
+                        color: tone.color,
+                      }}
+                    />
+                  ) : null}
+                </Box>
+
+                {!phone ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Chip
+                      size="small"
+                      label={PRIORITY_LABEL[priorityKey]}
+                      sx={{
+                        height: 24,
+                        fontWeight: 700,
+                        bgcolor: tone.bg,
+                        color: tone.color,
+                      }}
+                    />
                   </Box>
-                  <Chip
-                    size="small"
-                    label={PRIORITY_LABEL[priorityKey]}
-                    sx={{
-                      flexShrink: 0,
-                      height: 24,
-                      fontWeight: 700,
-                      bgcolor: tone.bg,
-                      color: tone.color,
-                    }}
-                  />
-                </Stack>
+                ) : null}
 
                 <Box sx={{ minWidth: 0 }}>
                   {phone ? (

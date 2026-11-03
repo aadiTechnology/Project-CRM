@@ -54,6 +54,7 @@ _RESERVED_KEYS = frozenset(
         "location",
         "reference",
         "call_summary",
+        "callsummary",
         "site",
         "order_amount",
     }

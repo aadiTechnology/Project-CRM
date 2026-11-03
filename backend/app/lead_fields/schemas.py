@@ -168,6 +168,7 @@ COMMON_FIELDS = [
     "Location",
     "Email",
     "Requirement",
+    "Call Summary",
     "Reference",
     "Lead source",
     "Priority",

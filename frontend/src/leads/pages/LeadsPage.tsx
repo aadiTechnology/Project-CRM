@@ -37,6 +37,7 @@ import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
+import { isDuplicateBuiltinLeadField } from '../../lead-fields/builtinLabels'
 import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManager'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
@@ -192,7 +193,12 @@ export function LeadsPage() {
       ? (fieldsByProject[projectFilter] ?? [])
       : Object.values(fieldsByProject).flat()
     for (const field of source) {
-      if (field.is_active && field.show_as_column && !map.has(field.key)) {
+      if (
+        field.is_active &&
+        field.show_as_column &&
+        !isDuplicateBuiltinLeadField(field.label, field.key) &&
+        !map.has(field.key)
+      ) {
         map.set(field.key, field)
       }
     }
@@ -247,7 +253,10 @@ export function LeadsPage() {
   }, [columnLoadError, clearColumnLoadError])
 
   const activeFields = useMemo(
-    () => projectFields.filter((field) => field.is_active),
+    () =>
+      projectFields.filter(
+        (field) => field.is_active && !isDuplicateBuiltinLeadField(field.label, field.key),
+      ),
     [projectFields],
   )
 
@@ -365,8 +374,13 @@ export function LeadsPage() {
 
   function subtitleFieldsForLead(lead: Lead): LeadField[] {
     if (!lead.project_id) return []
-    return (fieldsByProject[lead.project_id] ?? [])
-      .filter((field) => field.is_active && field.show_in_list && !field.show_as_column)
+    return (fieldsByProject[lead.project_id] ?? []).filter(
+      (field) =>
+        field.is_active &&
+        field.show_in_list &&
+        !field.show_as_column &&
+        !isDuplicateBuiltinLeadField(field.label, field.key),
+    )
       .slice(0, 3)
   }
 
@@ -687,7 +701,16 @@ export function LeadsPage() {
           onChange={(event) => setForm((current) => ({ ...current, requirement: event.target.value }))}
         />
 
-        {/* Hidden: Call Summary — use Set date / next follow-up instead */}
+        <TextField
+          label="Call Summary"
+          value={form.call_summary}
+          fullWidth
+          multiline
+          minRows={2}
+          disabled={disabled}
+          placeholder="Notes from the call"
+          onChange={(event) => setForm((current) => ({ ...current, call_summary: event.target.value }))}
+        />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <TextField

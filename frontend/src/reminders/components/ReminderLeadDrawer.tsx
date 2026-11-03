@@ -18,6 +18,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
+import { isDuplicateBuiltinLeadField, resolveCallSummary } from '../../lead-fields/builtinLabels'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
 import {
@@ -57,17 +58,6 @@ type DrawerForm = {
   extra_values: Record<string, string>
 }
 
-/** Temporarily hidden custom fields in Reminder drawer. */
-const HIDDEN_EXTRA_FIELD_LABELS = new Set([
-  'selling point',
-  'interested product',
-  'student strength',
-  'no of branch',
-  'no. of branch',
-  'number of branch',
-  'number of branches',
-])
-
 type ActionKind = 'noanswer' | null
 
 function formFromLead(lead: Lead): DrawerForm {
@@ -85,7 +75,7 @@ function formFromLead(lead: Lead): DrawerForm {
     email: lead.email ?? '',
     city: lead.city ?? '',
     requirement: lead.requirement ?? '',
-    call_summary: lead.call_summary ?? '',
+    call_summary: resolveCallSummary(lead.call_summary, lead.extra_values),
     lead_source: lead.lead_source ?? '',
     priority: lead.priority,
     status: lead.status,
@@ -379,7 +369,21 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                   }
                 }}
               />
-              {/* Hidden: Call summary — schedule via Set date instead */}
+              <TextField
+                label="Call Summary"
+                value={form.call_summary}
+                disabled={!canUpdate || saving}
+                multiline
+                minRows={3}
+                onChange={(event) => setForm({ ...form, call_summary: event.target.value })}
+                onBlur={() => {
+                  const next = form.call_summary.trim()
+                  const previous = resolveCallSummary(lead.call_summary, lead.extra_values)
+                  if (next !== previous) {
+                    void saveField({ call_summary: next || null })
+                  }
+                }}
+              />
               <TextField
                 select
                 label="Lead Source"
@@ -432,7 +436,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
               </TextField>
               {/* Hidden for now: Selling point / Interested product / Student strength / No of branch */}
               {fields
-                .filter((field) => !HIDDEN_EXTRA_FIELD_LABELS.has(field.label.trim().toLowerCase()))
+                .filter((field) => !isDuplicateBuiltinLeadField(field.label, field.key))
                 .map((field) => {
                 const value = form.extra_values[field.key] ?? ''
                 if (OPTION_TYPES.has(field.field_type)) {
