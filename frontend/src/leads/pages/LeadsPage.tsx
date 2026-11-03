@@ -30,6 +30,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
 import type { ColumnDef } from '../../column-visibility/definitions'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
@@ -162,6 +164,8 @@ export function LeadsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
   const [drawerFallback, setDrawerFallback] = useState<Lead | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
   const [planOpen, setPlanOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -1104,6 +1108,9 @@ export function LeadsPage() {
                     </Typography>
                   ) : null,
                 )}
+                <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
+                  Actions
+                </Typography>
               </Box>
               {pageRows.map((lead) => {
                 const clickable = canUpdate || isOwner
@@ -1217,6 +1224,21 @@ export function LeadsPage() {
                         </Typography>
                       ) : null,
                     )}
+                    <Box
+                      sx={{
+                        justifySelf: { xs: 'start', md: 'end' },
+                        gridColumn: { xs: '1', md: 'auto' },
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {canDelete ? (
+                        <DeleteIconButton
+                          onClick={() => setDeleteTarget(lead)}
+                          disabled={deleting}
+                          tooltip={`Delete ${lead.full_name}`}
+                        />
+                      ) : null}
+                    </Box>
                   </Box>
                 )
               })}
@@ -1480,6 +1502,33 @@ export function LeadsPage() {
         companyId={user?.company_id}
         onClose={() => setPlanOpen(false)}
         onSaved={setPlan}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete ${deleteTarget?.full_name}?`}
+        description="This will permanently delete the lead and all its data. This action cannot be undone."
+        confirmLabel="Delete lead"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return
+          const deletedId = deleteTarget.id
+          const deletedName = deleteTarget.full_name
+          setDeleting(true)
+          try {
+            await api.delete(`/api/v1/leads/${deletedId}`)
+            if (drawerLeadId === deletedId) closeLeadDrawer()
+            setDeleteTarget(null)
+            setNotice(`Lead deleted · ${deletedName}`)
+            await load()
+            await loadProjects()
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Could not delete lead.')
+          } finally {
+            setDeleting(false)
+          }
+        }}
       />
 
       <Drawer

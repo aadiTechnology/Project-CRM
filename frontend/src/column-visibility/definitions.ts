@@ -17,6 +17,7 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'follow_up', label: 'Follow-up', hideable: true, track: '100px' },
     { key: 'source', label: 'Source', hideable: true, track: '96px' },
+    { key: 'actions', label: 'Actions', hideable: false, track: '44px' },
   ],
   reminders: [
     { key: 'checkbox', label: 'Select', hideable: false, track: '22px' },
@@ -26,7 +27,7 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'due', label: 'Due', hideable: true, track: '100px' },
     { key: 'status', label: 'Status', hideable: true, track: '108px' },
-    { key: 'actions', label: 'Actions', hideable: false, track: '168px' },
+    { key: 'actions', label: 'Actions', hideable: false, track: '210px' },
   ],
   'follow-ups': [
     { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(0,1fr)' },
@@ -34,7 +35,7 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'phone', label: 'Phone', hideable: true, track: '120px' },
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'due', label: 'Due', hideable: true, track: '110px' },
-    { key: 'actions', label: 'Actions', hideable: false, track: '148px' },
+    { key: 'actions', label: 'Actions', hideable: false, track: '190px' },
   ],
 }
 

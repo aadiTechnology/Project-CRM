@@ -29,6 +29,8 @@ import { Link as RouterLink } from 'react-router-dom'
 
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
@@ -140,6 +142,8 @@ export function RemindersPage() {
   const [rescheduleLead, setRescheduleLead] = useState<Lead | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState(() => isoToDateInput(addDaysIso(null, 1)))
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setPlan(loadFollowupPlan(user?.company_id))
@@ -819,6 +823,13 @@ export function RemindersPage() {
                           </IconButton>
                         </span>
                       </Tooltip>
+                      {canDelete ? (
+                        <DeleteIconButton
+                          onClick={() => setDeleteTarget(lead)}
+                          disabled={saving}
+                          tooltip={`Delete ${lead.full_name}`}
+                        />
+                      ) : null}
                       <Tooltip title="Reschedule">
                         <span>
                           <IconButton
@@ -984,6 +995,32 @@ export function RemindersPage() {
         onClose={() => setDrawerLeadId(null)}
         onChanged={onDrawerChanged}
         onEditPlan={() => setPlanOpen(true)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete ${deleteTarget?.full_name}?`}
+        description="This will permanently delete the lead, its reminder, and all call history. This action cannot be undone."
+        confirmLabel="Delete lead"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return
+          const deletedId = deleteTarget.id
+          const deletedName = deleteTarget.full_name
+          setDeleting(true)
+          try {
+            await api.delete(`/api/v1/leads/${deletedId}`)
+            if (drawerLeadId === deletedId) setDrawerLeadId(null)
+            setDeleteTarget(null)
+            setNotice(`Lead deleted · ${deletedName}`)
+            await load()
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Could not delete lead.')
+          } finally {
+            setDeleting(false)
+          }
+        }}
       />
 
       <FollowupPlanSettingsDialog

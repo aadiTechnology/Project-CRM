@@ -1,6 +1,7 @@
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -18,6 +19,8 @@ import {
   Typography,
 } from '@mui/material'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
@@ -82,6 +85,13 @@ export function PipelinePage() {
   const [deleteStage, setDeleteStage] = useState<PipelineStage | null>(null)
   const [moveToKey, setMoveToKey] = useState('')
   const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState('')
+
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(''), 2200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   function closeManageDialog() {
     if (saving) return
@@ -257,13 +267,16 @@ export function PipelinePage() {
 
   async function confirmDelete() {
     if (!deleteStage || deleteStage.is_locked) return
+    const stageName = deleteStage.label
     setSaving(true)
     setError(null)
+    setNotice('')
     try {
       const q = moveToKey ? `?move_to_stage_key=${encodeURIComponent(moveToKey)}` : ''
       await api.delete(`/api/v1/pipeline-stages/${deleteStage.id}${q}`)
       setDeleteStage(null)
       setMoveToKey('')
+      setNotice(`Stage "${stageName}" removed successfully.`)
       await reloadBoard()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not delete the stage.')
@@ -315,6 +328,7 @@ export function PipelinePage() {
         ) : null}
       </Stack>
 
+      {notice ? <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert> : null}
       {error ? <ErrorAlert message={error} /> : null}
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
@@ -602,17 +616,14 @@ export function PipelinePage() {
                 >
                   {stage.is_locked ? 'Color' : 'Edit'}
                 </Button>
-                <Button
-                  size="small"
-                  color="error"
-                  disabled={stage.is_locked}
+                <DeleteIconButton
                   onClick={() => {
                     setDeleteStage(stage)
                     setMoveToKey(stages.find((item) => item.id !== stage.id)?.key ?? '')
                   }}
-                >
-                  Remove
-                </Button>
+                  disabled={stage.is_locked}
+                  tooltip={stage.is_locked ? 'Cannot remove locked stage' : 'Remove stage'}
+                />
               </Stack>
             ))}
           </Stack>

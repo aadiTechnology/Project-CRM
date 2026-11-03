@@ -20,6 +20,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
@@ -102,6 +104,8 @@ export function FollowUpsPage() {
   const [plan, setPlan] = useState<FollowupPlanStep[]>(() => loadFollowupPlan(user?.company_id))
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
   const [planOpen, setPlanOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setPlan(loadFollowupPlan(user?.company_id))
@@ -523,7 +527,22 @@ export function FollowUpsPage() {
                         </IconButton>
                       </span>
                     </Tooltip>
+                    {canDelete ? (
+                      <DeleteIconButton
+                        onClick={() => setDeleteTarget(lead)}
+                        disabled={saving || deleting}
+                        tooltip={`Delete ${lead.full_name}`}
+                      />
+                    ) : null}
                   </Stack>
+                ) : canDelete ? (
+                  <Box sx={{ justifySelf: 'end' }} onClick={(event) => event.stopPropagation()}>
+                    <DeleteIconButton
+                      onClick={() => setDeleteTarget(lead)}
+                      disabled={deleting}
+                      tooltip={`Delete ${lead.full_name}`}
+                    />
+                  </Box>
                 ) : (
                   <span />
                 )}
@@ -548,6 +567,32 @@ export function FollowUpsPage() {
         companyId={user?.company_id}
         onClose={() => setPlanOpen(false)}
         onSaved={setPlan}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={`Delete ${deleteTarget?.full_name}?`}
+        description="This will permanently delete the lead and all its data. This action cannot be undone."
+        confirmLabel="Delete lead"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return
+          const deletedId = deleteTarget.id
+          const deletedName = deleteTarget.full_name
+          setDeleting(true)
+          try {
+            await api.delete(`/api/v1/leads/${deletedId}`)
+            if (drawerLeadId === deletedId) setDrawerLeadId(null)
+            setDeleteTarget(null)
+            setNotice(`Lead deleted · ${deletedName}`)
+            await load()
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Could not delete lead.')
+          } finally {
+            setDeleting(false)
+          }
+        }}
       />
     </Stack>
   )

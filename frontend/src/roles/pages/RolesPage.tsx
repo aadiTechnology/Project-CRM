@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import type { RolePublic } from '../../auth/types'
 import { roleLabel } from '../../access/role-label'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { messageForError } from '../../auth/validation/errors'
@@ -277,15 +278,11 @@ export function RolesPage() {
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <span>{roleLabel(role.name, t)}</span>
                     {canUpdate && !role.is_system ? (
-                      <Button
-                        size="small"
-                        color="error"
-                        disabled={deletingId === role.id}
+                      <DeleteIconButton
                         onClick={() => setDeleteTarget(role)}
-                        sx={{ minHeight: 28, px: 1 }}
-                      >
-                        {t('access:deleteRole')}
-                      </Button>
+                        disabled={deletingId === role.id}
+                        tooltip={t('access:deleteRole')}
+                      />
                     ) : null}
                   </Stack>
                 </TableCell>

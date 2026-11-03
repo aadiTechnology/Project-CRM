@@ -17,6 +17,7 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
 import {
@@ -714,14 +715,11 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                   </Button>
                 ) : null}
                 {canDelete ? (
-                  <Button
-                    color="error"
-                    disabled={saving}
+                  <DeleteIconButton
                     onClick={() => setConfirmDeleteOpen(true)}
-                    sx={{ ml: 'auto' }}
-                  >
-                    Delete lead
-                  </Button>
+                    disabled={saving}
+                    tooltip="Delete lead"
+                  />
                 ) : null}
               </Stack>
             ) : null}

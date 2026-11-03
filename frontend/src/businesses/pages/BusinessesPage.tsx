@@ -1,3 +1,4 @@
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import {
   Alert,
   Box,
@@ -7,9 +8,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material'
@@ -17,6 +20,7 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -367,25 +371,25 @@ export function BusinessesPage() {
             <Typography color="text.secondary" variant="body2">
               {item.user_count} users · {item.project_count} projects · {item.lead_count} leads
             </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 'auto', pt: 1 }}>
-              <Button size="small" variant="outlined" onClick={() => openEdit(item)} fullWidth={phone}>
-                Edit
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                color="error"
-                disabled={!item.can_delete}
+            <Stack direction="row" spacing={1} sx={{ mt: 'auto', pt: 1, justifyContent: 'flex-end' }}>
+              <Tooltip title="Edit business">
+                <IconButton
+                  size="small"
+                  onClick={() => openEdit(item)}
+                  sx={{ border: '1px solid', borderColor: 'divider' }}
+                >
+                  <EditOutlinedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+              <DeleteIconButton
                 onClick={() => setDeleteTarget(item)}
-                fullWidth={phone}
-                title={
+                disabled={!item.can_delete}
+                tooltip={
                   item.can_delete
                     ? 'Delete this empty business'
                     : 'Remove users, projects, teams, and leads first, or set inactive'
                 }
-              >
-                Delete
-              </Button>
+              />
             </Stack>
           </Box>
         ))}
