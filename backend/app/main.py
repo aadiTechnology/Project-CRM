@@ -128,6 +128,10 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "X-CSRF-Token", "Accept", "Accept-Language"],
     )
+    @app.get("/api/v1/health", tags=["Health"], include_in_schema=False)
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
+
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(businesses_router, prefix="/api/v1/businesses", tags=["Businesses"])
     app.include_router(users_router, prefix="/api/v1/users", tags=["Users"])

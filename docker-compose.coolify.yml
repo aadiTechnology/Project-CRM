@@ -1,0 +1,66 @@
+# Coolify (Docker Compose build pack) deployment of Aadi CRM: web app, API and PostgreSQL.
+# Set the variables in the Coolify "Environment Variables" screen. See docs/COOLIFY_DEPLOYMENT.md.
+#
+# Only the `web` service is public (give it your domain, port 8080). It serves the pages and forwards
+# /api to the `api` service, so the browser sees one address and no CORS settings are needed.
+services:
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "8080"
+    environment:
+      NGINX_MAX_BODY: ${NGINX_MAX_BODY:-25m}
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      # POSTGRES_PASSWORD is placed inside a URL, so use letters and digits only (e.g. openssl rand -hex 24).
+      DATABASE_URL: postgresql+psycopg://crm:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/crm
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random characters)}
+      # The public address of the web app, no trailing slash (e.g. https://crm.example.com).
+      CORS_ORIGINS: ${APP_BASE_URL:?set APP_BASE_URL}
+      FRONTEND_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      # 'file' writes emails to the crm_outbox volume (trial only); use 'smtp' with SMTP_* for real email.
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-file}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@localhost}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+    volumes:
+      - crm_outbox:/app/var
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: crm
+    volumes:
+      - crm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  crm_pgdata:
+  crm_outbox:
