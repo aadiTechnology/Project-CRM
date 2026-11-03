@@ -1000,7 +1000,7 @@ export function RemindersPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={`Delete ${deleteTarget?.full_name}?`}
-        description="This will permanently delete the lead, its reminder, and all call history. This action cannot be undone."
+        description="Remove this lead from the project?"
         confirmLabel="Delete lead"
         loading={deleting}
         onCancel={() => setDeleteTarget(null)}

@@ -706,8 +706,8 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
       <ConfirmDialog
         open={confirmDeleteOpen}
         title={lead ? `Delete ${lead.full_name}?` : 'Delete lead?'}
-        description="This removes the lead, its reminder and all saved call history. It cannot be undone."
-        confirmLabel="Delete lead"
+        description="Remove this lead from the project?"
+        confirmLabel="Delete"
         loading={saving}
         onCancel={() => setConfirmDeleteOpen(false)}
         onConfirm={() => void deleteLead()}
@@ -716,8 +716,8 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
       <ConfirmDialog
         open={confirmClearOpen}
         title="Remove this reminder?"
-        description="The lead stays, but it will no longer appear in your reminders until you set a new date."
-        confirmLabel="Remove reminder"
+        description="Clear the next follow-up date for this lead?"
+        confirmLabel="Remove"
         loading={saving}
         onCancel={() => setConfirmClearOpen(false)}
         onConfirm={() => {

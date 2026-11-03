@@ -1,7 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
-import DeleteForeverOutlinedIcon from '@mui/icons-material/DeleteForeverOutlined'
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import {
   Box,
@@ -29,6 +28,7 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { toolbarIconSx } from '../../components/common/toolbarStyles'
@@ -417,15 +417,11 @@ export function LeadFieldsManager({
                     <IconButton size="small" disabled={saving} onClick={() => openEdit(field)}>
                       <EditOutlinedIcon sx={{ fontSize: 18 }} />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
+                    <DeleteIconButton
                       disabled={saving}
-                      aria-label={`Delete ${field.label}`}
+                      tooltip={`Delete ${field.label}`}
                       onClick={() => setDeleteTarget(field)}
-                    >
-                      <DeleteForeverOutlinedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
+                    />
                   </Stack>
                 </Stack>
                 <Stack direction="row" spacing={0.5}>
@@ -659,20 +655,11 @@ export function LeadFieldsManager({
                           </IconButton>
                         </span>
                       </Tooltip>
-                      <Tooltip title="Delete">
-                        <span>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            disabled={saving}
-                            aria-label={`Delete ${field.label}`}
-                            onClick={() => setDeleteTarget(field)}
-                            sx={{ p: 0.5 }}
-                          >
-                            <DeleteForeverOutlinedIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
+                      <DeleteIconButton
+                        disabled={saving}
+                        tooltip={`Delete ${field.label}`}
+                        onClick={() => setDeleteTarget(field)}
+                      />
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -836,7 +823,7 @@ export function LeadFieldsManager({
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={deleteTarget ? `Delete ${deleteTarget.label}?` : 'Delete field?'}
-        description="Leads will stop showing this field and any answers saved in it will be removed."
+        description="Remove this field from the project?"
         loading={saving}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => {

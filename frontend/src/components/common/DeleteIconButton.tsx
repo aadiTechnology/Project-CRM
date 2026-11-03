@@ -33,9 +33,9 @@ export function DeleteIconButton({
             width: 30,
             height: 30,
             borderRadius: '8px',
-            color: '#ef4444',
-            bgcolor: '#fef2f2',
-            '&:hover': { bgcolor: '#fee2e2', color: '#dc2626' },
+            color: '#f87171',
+            bgcolor: '#fff5f5',
+            '&:hover': { bgcolor: '#fef2f2', color: '#f87171' },
             '&.Mui-disabled': { opacity: 0.45, bgcolor: '#f8fafc', color: '#94a3b8' },
           }}
         >

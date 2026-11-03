@@ -1570,8 +1570,8 @@ export function LeadsPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title={`Delete ${deleteTarget?.full_name}?`}
-        description="This will permanently delete the lead and all its data. This action cannot be undone."
-        confirmLabel="Delete lead"
+        description="Remove this lead from the project?"
+        confirmLabel="Delete"
         loading={deleting}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={async () => {
