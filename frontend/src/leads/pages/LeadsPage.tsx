@@ -161,7 +161,7 @@ export function LeadsPage() {
   const [status, setStatus] = useState('')
   const [priority, setPriority] = useState('')
   const [source, setSource] = useState('')
-  const [projectFilter, setProjectFilter] = useState('')
+  const [projectFilter, setProjectFilter] = useState(() => searchParams.get('project') ?? '')
   const [page, setPage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
@@ -983,7 +983,14 @@ export function LeadsPage() {
           label="Project"
           required
           value={projectFilter}
-          onChange={(event) => setProjectFilter(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value
+            setProjectFilter(next)
+            const params = new URLSearchParams(searchParams)
+            if (next) params.set('project', next)
+            else params.delete('project')
+            setSearchParams(params, { replace: true })
+          }}
           disabled={projects.length === 0}
         >
           {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
