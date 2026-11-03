@@ -1,4 +1,3 @@
-import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
 import {
   Box,
@@ -11,7 +10,7 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
@@ -56,12 +55,6 @@ function lastRemark(lead: Lead): { title: string; detail?: string } {
   return { title: lines[lines.length - 1], detail: lines[lines.length - 2] }
 }
 
-function channelForLead(lead: Lead): 'call' | 'whatsapp' {
-  const source = (lead.lead_source || '').toLowerCase()
-  if (source.includes('whatsapp')) return 'whatsapp'
-  return 'call'
-}
-
 function nextFollowupMeta(lead: Lead): {
   text: string
   overdue: boolean
@@ -89,8 +82,7 @@ const DUE_FILTERS: { id: DueFilter; label: string }[] = [
   { id: 'u', label: 'Upcoming' },
 ]
 
-const FOLLOWUPS_GRID_MD =
-  'minmax(0,1.4fr) 120px 84px minmax(0,1.15fr) minmax(120px,140px) 88px'
+const FOLLOWUPS_GRID_MD = 'minmax(0,1.5fr) 130px 96px minmax(0,1.35fr) minmax(140px,180px)'
 const FOLLOWUPS_GRID_XS = '1fr'
 
 function ToneChip({ label, bg, color }: { label: string; bg?: string; color?: string }) {
@@ -379,7 +371,7 @@ export function FollowUpsPage() {
           </Typography>
         ) : (
           <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
-            <Box sx={{ minWidth: { md: 820 } }}>
+            <Box sx={{ minWidth: { md: 720 } }}>
               <Box
                 sx={{
                   display: { xs: 'none', md: 'grid' },
@@ -396,15 +388,12 @@ export function FollowUpsPage() {
                 <Typography sx={columnHeaderSx}>Priority</Typography>
                 <Typography sx={columnHeaderSx}>Last Remark</Typography>
                 <Typography sx={columnHeaderSx}>Follow-up</Typography>
-                <Typography sx={{ ...columnHeaderSx, textAlign: 'right' }}>Actions</Typography>
               </Box>
 
               {filtered.map((lead) => {
                 const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
                 const remark = lastRemark(lead)
                 const next = nextFollowupMeta(lead)
-                const channel = channelForLead(lead)
-                const tel = (lead.mobile || '').replace(/\s+/g, '')
 
                 return (
                   <Box
@@ -482,35 +471,6 @@ export function FollowUpsPage() {
                         {next.text}
                       </Box>
                     </Stack>
-
-                    <Box
-                      sx={{
-                        justifySelf: { xs: 'start', md: 'end' },
-                        gridColumn: { xs: '1', md: 'auto' },
-                      }}
-                      onClick={(event: MouseEvent) => event.stopPropagation()}
-                    >
-                      <Chip
-                        size="small"
-                        component={tel && channel === 'call' ? 'a' : 'div'}
-                        href={tel && channel === 'call' ? `tel:${tel}` : undefined}
-                        clickable={Boolean(tel && channel === 'call')}
-                        icon={
-                          channel === 'call' ? (
-                            <PhoneOutlinedIcon sx={{ fontSize: '14px !important' }} />
-                          ) : undefined
-                        }
-                        label={channel === 'whatsapp' ? 'WA' : 'Call'}
-                        sx={{
-                          height: 24,
-                          fontWeight: 600,
-                          textDecoration: 'none',
-                          bgcolor: '#fce4ec',
-                          color: '#e95d90',
-                          '& .MuiChip-icon': { color: '#e95d90' },
-                        }}
-                      />
-                    </Box>
                   </Box>
                 )
               })}

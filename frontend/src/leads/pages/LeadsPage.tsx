@@ -486,7 +486,6 @@ export function LeadsPage() {
       next.mobile = 'Mobile number must be 10 or 12 digits.'
     }
     if (!form.lead_source) next.lead_source = 'Choose a source.'
-    if (!form.city.trim()) next.city = 'Enter a city.'
     if (!form.enquiry_date.trim()) next.enquiry_date = 'Choose the enquiry date.'
     for (const field of activeFields) {
       if (!field.is_required) continue
@@ -659,11 +658,8 @@ export function LeadsPage() {
           <TextField
             label="City"
             value={form.city}
-            required
             fullWidth
             disabled={disabled}
-            error={Boolean(fieldErrors.city)}
-            helperText={fieldErrors.city}
             onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
           />
         </Stack>
