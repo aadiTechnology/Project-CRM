@@ -17,14 +17,12 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'follow_up', label: 'Follow-up', hideable: true, track: '100px' },
     { key: 'source', label: 'Source', hideable: true, track: '96px' },
-    { key: 'open', label: 'Open', hideable: false, track: '44px' },
   ],
   reminders: [
     { key: 'checkbox', label: 'Select', hideable: false, track: '22px' },
     { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(0,1fr)' },
     { key: 'project', label: 'Project', hideable: true, track: '120px' },
     { key: 'phone', label: 'Phone', hideable: true, track: '120px' },
-    { key: 'plan', label: 'Plan', hideable: true, track: '118px' },
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'due', label: 'Due', hideable: true, track: '100px' },
     { key: 'status', label: 'Status', hideable: true, track: '108px' },
@@ -34,7 +32,6 @@ export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
     { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(0,1fr)' },
     { key: 'project', label: 'Project', hideable: true, track: '120px' },
     { key: 'phone', label: 'Phone', hideable: true, track: '120px' },
-    { key: 'plan', label: 'Plan', hideable: true, track: '118px' },
     { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
     { key: 'due', label: 'Due', hideable: true, track: '110px' },
     { key: 'actions', label: 'Actions', hideable: false, track: '148px' },
@@ -63,11 +60,9 @@ export function buildGridTemplate(screen: ColumnScreen, visibility: Record<strin
   return buildGridTemplateFromColumns(SCREEN_COLUMNS[screen], visibility)
 }
 
-/** Insert custom lead-field columns before the locked Open action column. */
+/** Append custom lead-field columns after the base Leads columns. */
 export function mergeLeadsColumns(extraColumns: readonly ColumnDef[]): ColumnDef[] {
   const base = SCREEN_COLUMNS.leads
   if (!extraColumns.length) return [...base]
-  const open = base.find((col) => col.key === 'open')
-  const rest = base.filter((col) => col.key !== 'open')
-  return open ? [...rest, ...extraColumns, open] : [...rest, ...extraColumns]
+  return [...base, ...extraColumns]
 }

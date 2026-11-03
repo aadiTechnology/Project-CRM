@@ -345,11 +345,6 @@ export function FollowUpsPage() {
                 Phone
               </Typography>
             ) : null}
-            {isColumnVisible('plan') ? (
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Plan
-              </Typography>
-            ) : null}
             {isColumnVisible('priority') ? (
               <Typography variant="caption" fontWeight={700} color="text.secondary">
                 Priority
@@ -430,19 +425,6 @@ export function FollowUpsPage() {
                   <Typography variant="body2" noWrap sx={{ color: 'primary.main', fontWeight: 600 }}>
                     {lead.mobile || '—'}
                   </Typography>
-                ) : null}
-                {isColumnVisible('plan') ? (
-                  <Chip
-                    size="small"
-                    label={planLabel}
-                    sx={{
-                      justifySelf: 'start',
-                      bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
-                      color,
-                      fontWeight: 600,
-                      borderRadius: '999px',
-                    }}
-                  />
                 ) : null}
                 {isColumnVisible('priority') ? (
                   <Chip

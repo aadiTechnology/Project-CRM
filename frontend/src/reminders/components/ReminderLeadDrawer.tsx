@@ -23,7 +23,6 @@ import {
   FollowupPlanStep,
   gapForStep,
   nextPlanStep,
-  stepIndex as planStepIndex,
   waitDaysAfterStep,
 } from '../../followup-plan/plan'
 import {
@@ -50,6 +49,7 @@ type DrawerForm = {
   email: string
   city: string
   requirement: string
+  call_summary: string
   lead_source: string
   priority: LeadPriority
   status: LeadStatus
@@ -57,7 +57,18 @@ type DrawerForm = {
   extra_values: Record<string, string>
 }
 
-type ActionKind = 'connected' | 'noanswer' | 'skip' | 'note' | null
+/** Temporarily hidden custom fields in Reminder drawer. */
+const HIDDEN_EXTRA_FIELD_LABELS = new Set([
+  'selling point',
+  'interested product',
+  'student strength',
+  'no of branch',
+  'no. of branch',
+  'number of branch',
+  'number of branches',
+])
+
+type ActionKind = 'noanswer' | 'skip' | 'note' | null
 
 function currentPlanLabel(lead: Lead, plan: FollowupPlanStep[]) {
   const step = (lead.plan_step || '').trim()
@@ -82,6 +93,7 @@ function formFromLead(lead: Lead): DrawerForm {
     email: lead.email ?? '',
     city: lead.city ?? '',
     requirement: lead.requirement ?? '',
+    call_summary: lead.call_summary ?? '',
     lead_source: lead.lead_source ?? '',
     priority: lead.priority,
     status: lead.status,
@@ -112,7 +124,7 @@ function formatActivityAt(value: string) {
   return date.toLocaleDateString('en-CA')
 }
 
-export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, onEditPlan }: Props) {
+export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }: Props) {
   const theme = useTheme()
   const phone = useMediaQuery(theme.breakpoints.down('md'))
   const open = Boolean(lead)
@@ -165,7 +177,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
 
   const statusTone = lead ? STATUS_TONE[lead.status] ?? STATUS_TONE.new : STATUS_TONE.new
   const currentStep = lead ? currentPlanLabel(lead, plan) : plan[0]?.label || 'Day 1'
-  const currentIdx = planStepIndex(plan, currentStep)
 
   const closed = lead ? lead.status === 'won' || lead.status === 'lost' : false
 
@@ -194,27 +205,28 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
     await patch(body, 'Lead updated.')
   }
 
+  async function saveCallDone() {
+    if (!lead || !form) return
+    const summary = form.call_summary.trim()
+    if (!summary) {
+      setLocalError('Write the Call summary above, then tap Call done.')
+      return
+    }
+    const next = nextPlanStep(plan, currentStep)
+    const waitDays = waitDaysAfterStep(plan, currentStep)
+    const body: Record<string, unknown> = {
+      call_summary: summary,
+      plan_step: next?.label ?? currentStep,
+      next_followup_at: next ? addDaysIso(null, waitDays) : null,
+      requirement: lead.requirement ? `${lead.requirement}\nCall: ${summary}` : `Call: ${summary}`,
+    }
+    if (lead.status === 'new') body.status = 'contacted'
+    await patch(body, `Call done · ${lead.full_name}`)
+  }
+
   async function submitAction(event: FormEvent) {
     event.preventDefault()
     if (!lead || !action) return
-
-    if (action === 'connected') {
-      const summary = actionNote.trim()
-      if (!summary) {
-        setLocalError('Write a short call summary.')
-        return
-      }
-      const next = nextPlanStep(plan, currentStep)
-      const waitDays = waitDaysAfterStep(plan, currentStep)
-      const body: Record<string, unknown> = {
-        plan_step: next?.label ?? currentStep,
-        next_followup_at: next ? addDaysIso(null, waitDays) : null,
-        requirement: lead.requirement ? `${lead.requirement}\nCall: ${summary}` : `Call: ${summary}`,
-      }
-      if (lead.status === 'new') body.status = 'contacted'
-      await patch(body, `Connected · ${lead.full_name}`)
-      return
-    }
 
     if (action === 'noanswer') {
       const note = actionNote.trim() || 'No answer'
@@ -273,8 +285,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
 
   const actionTitle = useMemo(() => {
     switch (action) {
-      case 'connected':
-        return 'Mark connected'
       case 'noanswer':
         return 'No answer'
       case 'skip':
@@ -398,6 +408,20 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
                 }}
               />
               <TextField
+                label="Call summary"
+                value={form.call_summary}
+                disabled={!canUpdate || saving}
+                multiline
+                minRows={3}
+                helperText="Fill this, then tap Call done"
+                onChange={(event) => setForm({ ...form, call_summary: event.target.value })}
+                onBlur={() => {
+                  if (form.call_summary !== (lead.call_summary ?? '')) {
+                    void saveField({ call_summary: form.call_summary.trim() || null })
+                  }
+                }}
+              />
+              <TextField
                 select
                 label="Lead Source"
                 value={form.lead_source}
@@ -447,7 +471,10 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
                   </MenuItem>
                 ))}
               </TextField>
-              {fields.map((field) => {
+              {/* Hidden for now: Selling point / Interested product / Student strength / No of branch */}
+              {fields
+                .filter((field) => !HIDDEN_EXTRA_FIELD_LABELS.has(field.label.trim().toLowerCase()))
+                .map((field) => {
                 const value = form.extra_values[field.key] ?? ''
                 if (OPTION_TYPES.has(field.field_type)) {
                   return (
@@ -503,55 +530,15 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
               })}
             </Box>
 
-            <Box>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-                <Typography fontWeight={700} sx={{ flex: 1 }}>
-                  Follow-up plan
+            {/* Follow-up plan steps hidden — keep reminder schedule */}
+            {canUpdate ? (
+              <Box>
+                <Typography fontWeight={700} sx={{ mb: 1 }}>
+                  Schedule reminder
                 </Typography>
-                {onEditPlan ? (
-                  <Button size="small" onClick={onEditPlan}>
-                    Edit days
-                  </Button>
-                ) : null}
-              </Stack>
-              <Stack direction="row" spacing={0.75} sx={{ overflowX: 'auto', pb: 0.5 }}>
-                {plan.map((step, index) => {
-                  const done = currentIdx >= 0 && index < currentIdx
-                  const showCurrent = currentStep === step.label
-                  return (
-                    <Box
-                      key={`${step.label}-${index}`}
-                      sx={{
-                        flex: '1 0 72px',
-                        minWidth: 72,
-                        border: '1px solid',
-                        borderColor: showCurrent ? 'primary.main' : 'divider',
-                        bgcolor: done ? '#ecfdf5' : showCurrent ? '#eff6ff' : '#fff',
-                        borderRadius: '8px',
-                        p: 0.75,
-                        fontSize: 12,
-                        fontWeight: showCurrent ? 700 : 500,
-                      }}
-                    >
-                      {step.label}
-                      <Typography component="div" variant="caption" color="text.secondary" display="block">
-                        {showCurrent
-                          ? `Due ${isoToDateInput(lead.next_followup_at) || '—'}`
-                          : done
-                            ? 'Done'
-                            : index < plan.length - 1
-                              ? `+${step.gapDays}d`
-                              : ''}
-                      </Typography>
-                    </Box>
-                  )
-                })}
-              </Stack>
-
-              {canUpdate ? (
-                <Stack direction="row" spacing={1} sx={{ mt: 1.25, alignItems: 'center' }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <TextField
-                    label="Custom date"
+                    label="Due date"
                     type="date"
                     size="small"
                     value={customDueDate}
@@ -573,20 +560,20 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
                           plan_step: CUSTOM_STEP,
                           next_followup_at: iso,
                         },
-                        `Custom date set · ${lead.full_name}`,
+                        `Reminder scheduled · ${lead.full_name}`,
                       )
                     }}
                   >
                     Set date
                   </Button>
                 </Stack>
-              ) : null}
-              {currentStep === CUSTOM_STEP && lead.next_followup_at ? (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
-                  On custom date · due {isoToDateInput(lead.next_followup_at)}
-                </Typography>
-              ) : null}
-            </Box>
+                {lead.next_followup_at ? (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                    Current due {isoToDateInput(lead.next_followup_at)}
+                  </Typography>
+                ) : null}
+              </Box>
+            ) : null}
 
             {canUpdate ? (
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -595,13 +582,9 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
                     <Button
                       variant="contained"
                       disabled={saving}
-                      onClick={() => {
-                        setAction('connected')
-                        setActionNote('')
-                        setLocalError('')
-                      }}
+                      onClick={() => void saveCallDone()}
                     >
-                      Mark connected
+                      Call done
                     </Button>
                     <Button
                       disabled={saving}
@@ -636,16 +619,6 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
                     </Button>
                   </>
                 ) : null}
-                <Button
-                  disabled={saving}
-                  onClick={() => {
-                    setAction('note')
-                    setActionNote('')
-                    setLocalError('')
-                  }}
-                >
-                  Add call summary
-                </Button>
                 {!closed ? (
                   <Button
                     disabled={saving}
@@ -722,20 +695,14 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged, 
             {lead ? ` · ${lead.full_name}` : ''}
           </DialogTitle>
           <DialogContent>
-            {action === 'connected' || action === 'noanswer' || action === 'skip' || action === 'note' ? (
+            {action === 'noanswer' || action === 'skip' || action === 'note' ? (
               <TextField
-                label={
-                  action === 'connected' || action === 'note'
-                    ? 'Call summary'
-                    : action === 'skip'
-                      ? 'Reason'
-                      : 'One-line note'
-                }
+                label={action === 'note' ? 'Call summary' : action === 'skip' ? 'Reason' : 'One-line note'}
                 required={action !== 'noanswer'}
                 value={actionNote}
                 fullWidth
                 multiline
-                minRows={action === 'connected' || action === 'note' ? 3 : 2}
+                minRows={action === 'note' ? 3 : 2}
                 autoFocus
                 sx={{ mt: 1 }}
                 onChange={(event) => setActionNote(event.target.value)}

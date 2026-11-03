@@ -1,7 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import CheckIcon from '@mui/icons-material/Check'
 import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined'
 import PhoneInTalkOutlinedIcon from '@mui/icons-material/PhoneInTalkOutlined'
 import PhoneMissedOutlinedIcon from '@mui/icons-material/PhoneMissedOutlined'
 import SnoozeOutlinedIcon from '@mui/icons-material/SnoozeOutlined'
@@ -137,8 +136,6 @@ export function RemindersPage() {
   const [addDate, setAddDate] = useState(() => isoToDateInput(addDaysIso(null, 1)))
   const [addPriority, setAddPriority] = useState('')
   const [addNotes, setAddNotes] = useState('')
-  const [callLead, setCallLead] = useState<Lead | null>(null)
-  const [callSummary, setCallSummary] = useState('')
   const [rescheduleLead, setRescheduleLead] = useState<Lead | null>(null)
   const [rescheduleDate, setRescheduleDate] = useState(() => isoToDateInput(addDaysIso(null, 1)))
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
@@ -346,27 +343,6 @@ export function RemindersPage() {
     } finally {
       setSaving(false)
     }
-  }
-
-  async function saveCallDone(event: FormEvent) {
-    event.preventDefault()
-    if (!callLead) return
-    const note = callSummary.trim()
-    const requirement = note
-      ? `${callLead.requirement ? `${callLead.requirement}\n` : ''}Call: ${note}`
-      : callLead.requirement
-    await patchLead(
-      callLead.id,
-      {
-        status: 'contacted',
-        requirement,
-        next_followup_at: addDaysIso(null, plan[0]?.gapDays ?? 2),
-        plan_step: plan[1]?.label ?? plan[0]?.label ?? 'Day 1',
-      },
-      `Call done for ${callLead.full_name}.`,
-    )
-    setCallLead(null)
-    setCallSummary('')
   }
 
   async function saveReminder(event: FormEvent) {
@@ -621,11 +597,6 @@ export function RemindersPage() {
                   Phone
                 </Typography>
               ) : null}
-              {isColumnVisible('plan') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Plan
-                </Typography>
-              ) : null}
               {isColumnVisible('priority') ? (
                 <Typography variant="caption" fontWeight={700} color="text.secondary">
                   Priority
@@ -641,7 +612,7 @@ export function RemindersPage() {
                   Status
                 </Typography>
               ) : null}
-              <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
+              <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="left">
                 Actions
               </Typography>
             </Box>
@@ -740,21 +711,6 @@ export function RemindersPage() {
                       {lead.mobile || '—'}
                     </Typography>
                   ) : null}
-                  {isColumnVisible('plan') ? (
-                    <Chip
-                      size="small"
-                      label={step}
-                      sx={{
-                        justifySelf: 'start',
-                        gridColumn: { xs: '2', md: 'auto' },
-                        ml: { xs: '54px', md: 0 },
-                        bgcolor: `color-mix(in srgb, ${color} 12%, #fff)`,
-                        color,
-                        fontWeight: 600,
-                        borderRadius: '999px',
-                      }}
-                    />
-                  ) : null}
                   {isColumnVisible('priority') ? (
                     <Chip
                       size="small"
@@ -811,21 +767,18 @@ export function RemindersPage() {
                       onClick={(event) => event.stopPropagation()}
                       sx={{
                         gridColumn: { xs: '2', md: 'auto' },
-                        justifyContent: { xs: 'flex-start', md: 'flex-end' },
+                        justifyContent: 'flex-start',
                         ml: { xs: '54px', md: 0 },
                       }}
                     >
-                      <Tooltip title="Done">
+                      <Tooltip title="Write call summary">
                         <span>
                           <IconButton
                             size="small"
                             color="primary"
                             disabled={saving}
-                            aria-label={`Call done ${lead.full_name}`}
-                            onClick={() => {
-                              setCallLead(lead)
-                              setCallSummary('')
-                            }}
+                            aria-label={`Write call summary ${lead.full_name}`}
+                            onClick={() => openLead(lead)}
                             sx={{
                               width: 30,
                               height: 30,
@@ -838,16 +791,6 @@ export function RemindersPage() {
                             <CheckIcon sx={{ fontSize: 16 }} />
                           </IconButton>
                         </span>
-                      </Tooltip>
-                      <Tooltip title="Open lead">
-                        <IconButton
-                          size="small"
-                          aria-label={`Open ${lead.full_name}`}
-                          onClick={() => openLead(lead)}
-                          sx={actionIconSx}
-                        >
-                          <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
                       </Tooltip>
                       <Tooltip title="No answer">
                         <span>
@@ -1007,30 +950,6 @@ export function RemindersPage() {
           </Stack>
         </Box>
       </Drawer>
-
-      <Dialog open={Boolean(callLead)} onClose={() => setCallLead(null)} fullWidth maxWidth="xs">
-        <Box component="form" onSubmit={(event) => void saveCallDone(event)}>
-          <DialogTitle>Call done · {callLead?.full_name}</DialogTitle>
-          <DialogContent>
-            <TextField
-              label="Call summary"
-              value={callSummary}
-              fullWidth
-              multiline
-              minRows={3}
-              autoFocus
-              sx={{ mt: 1 }}
-              onChange={(event) => setCallSummary(event.target.value)}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setCallLead(null)}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={saving}>
-              Save
-            </Button>
-          </DialogActions>
-        </Box>
-      </Dialog>
 
       <Dialog open={Boolean(rescheduleLead)} onClose={() => setRescheduleLead(null)} fullWidth maxWidth="xs">
         <Box component="form" onSubmit={(event) => void saveReschedule(event)}>

@@ -1,7 +1,6 @@
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined'
-import OpenInNewOutlinedIcon from '@mui/icons-material/OpenInNewOutlined'
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined'
 import {
@@ -157,6 +156,7 @@ export function LeadsPage() {
   const [priority, setPriority] = useState('')
   const [source, setSource] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [drawerLeadId, setDrawerLeadId] = useState<string | null>(null)
@@ -317,6 +317,16 @@ export function LeadsPage() {
     setLoading(true)
     void load()
   }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, status, priority, source, projectFilter])
+
+  const perPage = 21
+  const pages = Math.max(1, Math.ceil(items.length / perPage))
+  const pageSafe = Math.min(page, pages)
+  const pageRows = items.slice((pageSafe - 1) * perPage, pageSafe * perPage)
+  const showPagination = items.length > perPage
 
   const loadFieldsForProject = useCallback(
     async (projectId: string) => {
@@ -1082,11 +1092,8 @@ export function LeadsPage() {
                     </Typography>
                   ) : null,
                 )}
-                <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
-                  {' '}
-                </Typography>
               </Box>
-              {items.map((lead) => {
+              {pageRows.map((lead) => {
                 const clickable = canUpdate || isOwner
                 const statusTone = STATUS_TONE[lead.status] ?? { bg: '#f1f5f9', color: '#475569' }
                 const leadSubtitleFields = subtitleFieldsForLead(lead)
@@ -1198,38 +1205,41 @@ export function LeadsPage() {
                         </Typography>
                       ) : null,
                     )}
-                    <Stack
-                      direction="row"
-                      onClick={(event) => event.stopPropagation()}
-                      sx={{
-                        justifyContent: 'flex-end',
-                        gridColumn: { xs: '2', md: 'auto' },
-                        gridRow: { xs: '1', md: 'auto' },
-                      }}
-                    >
-                      <Tooltip title="Open">
-                        <IconButton
-                          size="small"
-                          aria-label={`Open ${lead.full_name}`}
-                          onClick={() => openLead(lead)}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: '8px',
-                            color: 'text.secondary',
-                            '&:hover': { bgcolor: '#eef2f7', color: 'text.primary' },
-                          }}
-                        >
-                          <OpenInNewOutlinedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
                   </Box>
                 )
               })}
             </Box>
           </Box>
         )}
+
+        <Stack direction="row" spacing={1} sx={{ px: 2, py: 1.5, alignItems: 'center', color: 'text.secondary' }}>
+          <Typography variant="body2" sx={{ flex: 1 }}>
+            Showing {pageRows.length} of {items.length} leads
+          </Typography>
+          {showPagination ? (
+            <>
+              <Button
+                size="small"
+                disabled={pageSafe <= 1}
+                onClick={() => setPage((current) => current - 1)}
+                sx={{ minWidth: 32, height: 32, border: '1px solid #dbe3ee', borderRadius: '8px' }}
+              >
+                ‹
+              </Button>
+              <Typography variant="body2">
+                {pageSafe} / {pages}
+              </Typography>
+              <Button
+                size="small"
+                disabled={pageSafe >= pages}
+                onClick={() => setPage((current) => current + 1)}
+                sx={{ minWidth: 32, height: 32, border: '1px solid #dbe3ee', borderRadius: '8px' }}
+              >
+                ›
+              </Button>
+            </>
+          ) : null}
+        </Stack>
       </Box>
 
       <Dialog

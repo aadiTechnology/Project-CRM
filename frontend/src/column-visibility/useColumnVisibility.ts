@@ -78,7 +78,7 @@ export function useColumnVisibility(screen: ColumnScreen, extraColumns: readonly
   /** Phone layouts that keep only locked + lead tracks. */
   const gridTemplateXs = useMemo(() => {
     if (screen === 'reminders') return '22px minmax(0,1fr)'
-    if (screen === 'leads') return 'minmax(0,1fr) auto'
+    if (screen === 'leads') return 'minmax(0,1fr)'
     return 'minmax(0,1fr)'
   }, [screen])
 
