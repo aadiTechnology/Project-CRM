@@ -105,6 +105,19 @@ export const theme = createTheme({
           lineHeight: 1.5,
           boxSizing: 'border-box',
         },
+        // Keep placeholder/value vertically centered when size="small" (theme minHeight is 48).
+        inputSizeSmall: {
+          padding: '13px 14px',
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: {
+          display: 'flex',
+          alignItems: 'center',
+          minHeight: '1.4375em',
+        },
       },
     },
     MuiInputLabel: {

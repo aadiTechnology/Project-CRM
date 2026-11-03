@@ -121,6 +121,7 @@ export function FollowUpsPage() {
       try {
         const result = await api.get<{ items: LeadProjectOption[] }>('/api/v1/projects')
         setProjects(result.data.items)
+        setProjectId((current) => current || result.data.items[0]?.id || '')
       } catch {
         setProjects([])
       }
@@ -232,28 +233,30 @@ export function FollowUpsPage() {
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} sx={{ alignItems: { sm: 'center' } }}>
         <TextField
-          size="small"
-          label="Search"
-          placeholder="Name, mobile, remark…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          sx={{ width: { xs: '100%', sm: 240 } }}
-        />
-        <TextField
           select
           size="small"
           label="Project"
+          required
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
           sx={{ width: { xs: '100%', sm: 200 } }}
+          disabled={projects.length === 0}
         >
-          <MenuItem value="">All projects</MenuItem>
+          {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
               {project.name}
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          size="small"
+          placeholder="Search name, mobile, remark…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          sx={{ width: { xs: '100%', sm: 260 } }}
+          disabled={!projectId}
+        />
         <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ ml: { sm: 'auto' } }}>
           {DUE_FILTERS.map((item) => {
             const count =

@@ -282,6 +282,7 @@ export function LeadsPage() {
     try {
       const result = await api.get<{ items: LeadProjectOption[]; can_create: boolean }>('/api/v1/projects')
       setProjects(result.data.items)
+      setProjectFilter((current) => current || result.data.items[0]?.id || '')
       return result.data.items
     } catch (requestError) {
       setProjects([])
@@ -951,27 +952,36 @@ export function LeadsPage() {
         }}
       >
         <TextField
-          size="small"
-          label="Search"
-          placeholder="Name, mobile, email…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <TextField
           select
           size="small"
           label="Project"
+          required
           value={projectFilter}
           onChange={(event) => setProjectFilter(event.target.value)}
+          disabled={projects.length === 0}
         >
-          <MenuItem value="">All projects</MenuItem>
+          {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
               {project.name}
             </MenuItem>
           ))}
         </TextField>
-        <TextField select size="small" label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <TextField
+          size="small"
+          placeholder="Search name, mobile, email…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          disabled={!projectFilter}
+        />
+        <TextField
+          select
+          size="small"
+          label="Status"
+          value={status}
+          onChange={(event) => setStatus(event.target.value)}
+          disabled={!projectFilter}
+        >
           <MenuItem value="">All statuses</MenuItem>
           {LEAD_STATUSES.map((item) => (
             <MenuItem key={item} value={item}>
@@ -985,6 +995,7 @@ export function LeadsPage() {
           label="Priority"
           value={priority}
           onChange={(event) => setPriority(event.target.value)}
+          disabled={!projectFilter}
         >
           <MenuItem value="">All</MenuItem>
           {LEAD_PRIORITIES.map((item) => (
@@ -993,7 +1004,14 @@ export function LeadsPage() {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select size="small" label="Source" value={source} onChange={(event) => setSource(event.target.value)}>
+        <TextField
+          select
+          size="small"
+          label="Source"
+          value={source}
+          onChange={(event) => setSource(event.target.value)}
+          disabled={!projectFilter}
+        >
           <MenuItem value="">All sources</MenuItem>
           {LEAD_SOURCES.map((item) => (
             <MenuItem key={item} value={item}>

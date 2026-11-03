@@ -165,6 +165,7 @@ export function RemindersPage() {
   const loadProjects = useCallback(async () => {
     const result = await api.get<{ items: LeadProjectOption[] }>('/api/v1/projects')
     setProjects(result.data.items)
+    setProjectId((current) => current || result.data.items[0]?.id || '')
   }, [])
 
   const load = useCallback(async () => {
@@ -430,20 +431,15 @@ export function RemindersPage() {
         }}
       >
         <TextField
-          size="small"
-          label="Search"
-          placeholder="Search reminder, lead, mobile"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <TextField
           select
           size="small"
           label="Project"
+          required
           value={projectId}
           onChange={(event) => setProjectId(event.target.value)}
+          disabled={projects.length === 0}
         >
-          <MenuItem value="">All projects</MenuItem>
+          {projects.length === 0 ? <MenuItem value="">No projects</MenuItem> : null}
           {projects.map((project) => (
             <MenuItem key={project.id} value={project.id}>
               {project.name}
@@ -451,11 +447,19 @@ export function RemindersPage() {
           ))}
         </TextField>
         <TextField
+          size="small"
+          placeholder="Search reminder, lead, mobile…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          disabled={!projectId}
+        />
+        <TextField
           select
           size="small"
           label="When"
           value={when}
           onChange={(event) => setWhen(event.target.value as WhenFilter)}
+          disabled={!projectId}
         >
           <MenuItem value="ALL">All dates</MenuItem>
           <MenuItem value="o">Overdue</MenuItem>
@@ -468,6 +472,7 @@ export function RemindersPage() {
           label="Priority"
           value={priority}
           onChange={(event) => setPriority(event.target.value)}
+          disabled={!projectId}
         >
           <MenuItem value="">All</MenuItem>
           <MenuItem value="high">Hot</MenuItem>
