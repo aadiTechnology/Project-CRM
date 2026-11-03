@@ -452,11 +452,9 @@ export function FollowUpsPage() {
                       height: 24,
                       fontWeight: 700,
                       textDecoration: 'none',
-                      ...(next.overdue
-                        ? { bgcolor: '#fee2e2', color: '#b91c1c', '& .MuiChip-icon': { color: '#b91c1c' } }
-                        : channel === 'whatsapp'
-                          ? { bgcolor: '#ecfdf5', color: '#047857' }
-                          : { bgcolor: '#dbeafe', color: '#1d4ed8', '& .MuiChip-icon': { color: '#1d4ed8' } }),
+                      bgcolor: '#fce4ec',
+                      color: '#e95d90',
+                      '& .MuiChip-icon': { color: '#e95d90' },
                     }}
                   />
                 </Stack>

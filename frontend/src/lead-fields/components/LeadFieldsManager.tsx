@@ -528,8 +528,8 @@ export function LeadFieldsManager({
             <TableHead>
               <TableRow>
                 <TableCell sx={{ width: 72 }}>Order</TableCell>
-                <TableCell sx={{ width: '26%' }}>Field</TableCell>
-                <TableCell sx={{ width: '10%' }}>Type</TableCell>
+                <TableCell sx={{ width: '34%', minWidth: 160 }}>Field</TableCell>
+                <TableCell sx={{ width: '12%' }}>Type</TableCell>
                 <TableCell align="center" sx={{ width: '10%' }}>
                   Required
                 </TableCell>
@@ -584,11 +584,20 @@ export function LeadFieldsManager({
                       </Tooltip>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ maxWidth: 220 }}>
-                    <Typography fontWeight={700} sx={{ wordBreak: 'break-word' }}>
+                  <TableCell sx={{ overflow: 'visible' }}>
+                    <Typography
+                      fontWeight={700}
+                      title={field.label}
+                      sx={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.35 }}
+                    >
                       {field.label}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" display="block" sx={{ wordBreak: 'break-word' }}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ whiteSpace: 'normal', overflowWrap: 'anywhere' }}
+                    >
                       {field.key}
                       {field.options?.length ? ` · ${field.options.join(', ')}` : ''}
                       {field.leads_with_data ? ` · ${field.leads_with_data} leads` : ''}
@@ -674,13 +683,28 @@ export function LeadFieldsManager({
         </Box>
       )}
 
-      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="xs">
+      <Dialog
+        open={dialogOpen}
+        onClose={() => !saving && setDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            width: '100%',
+            maxWidth: 360,
+            borderRadius: '14px',
+            overflow: 'visible',
+          },
+        }}
+      >
         <Box component="form" onSubmit={onSaveField}>
-          <DialogTitle sx={{ py: 1.5, fontSize: 18 }}>{editing ? 'Edit field' : 'Add field'}</DialogTitle>
-          <DialogContent sx={{ pt: 0.5, pb: 1 }}>
-            <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+          <DialogTitle sx={{ py: 1.25, px: 2, fontSize: 17, fontWeight: 700 }}>
+            {editing ? 'Edit field' : 'Add field'}
+          </DialogTitle>
+          <DialogContent sx={{ px: 2, pt: 0.5, pb: 0.5, overflow: 'visible' }}>
+            <Stack spacing={1.5} sx={{ pt: 1 }}>
               <TextField
-                label="Field label"
+                label="Field name"
                 value={form.label}
                 required
                 fullWidth
@@ -689,9 +713,11 @@ export function LeadFieldsManager({
                 disabled={saving}
                 error={Boolean(fieldErrors.label)}
                 helperText={
-                  fieldErrors.label || 'Must be unique — cannot match another field or a built-in column'
+                  fieldErrors.label || 'Unique name — not used by another field or built-in column'
                 }
+                FormHelperTextProps={{ sx: { mx: 0, wordBreak: 'break-word' } }}
                 inputProps={{ maxLength: 40 }}
+                InputLabelProps={{ sx: { maxWidth: 'calc(100% - 24px)' } }}
                 onChange={(event) => {
                   setForm((current) => ({ ...current, label: event.target.value }))
                   if (fieldErrors.label) {
@@ -710,6 +736,7 @@ export function LeadFieldsManager({
                 value={form.field_type}
                 fullWidth
                 disabled={saving || typeLocked}
+                InputLabelProps={{ sx: { maxWidth: 'calc(100% - 24px)' } }}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, field_type: event.target.value as LeadFieldType }))
                 }
@@ -731,56 +758,67 @@ export function LeadFieldsManager({
                   disabled={saving}
                   error={Boolean(fieldErrors.optionsText)}
                   helperText={fieldErrors.optionsText || 'Dropdown / Multi-select / Radio'}
+                  FormHelperTextProps={{ sx: { mx: 0, wordBreak: 'break-word' } }}
                   onChange={(event) => setForm((current) => ({ ...current, optionsText: event.target.value }))}
                 />
               ) : null}
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={form.is_required}
-                    disabled={saving}
-                    onChange={(event) => setForm((current) => ({ ...current, is_required: event.target.checked }))}
-                  />
-                }
-                label="Required"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={form.show_in_list}
-                    disabled={saving}
-                    onChange={(event) => setForm((current) => ({ ...current, show_in_list: event.target.checked }))}
-                  />
-                }
-                label="In list"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={form.show_as_column}
-                    disabled={saving}
-                    onChange={(event) => setForm((current) => ({ ...current, show_as_column: event.target.checked }))}
-                  />
-                }
-                label="Separate column"
-              />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={form.is_active}
-                    disabled={saving}
-                    onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
-                  />
-                }
-                label="Active"
-              />
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 0.25,
+                }}
+              >
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={form.is_required}
+                      disabled={saving}
+                      onChange={(event) => setForm((current) => ({ ...current, is_required: event.target.checked }))}
+                    />
+                  }
+                  label="Required"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={form.show_in_list}
+                      disabled={saving}
+                      onChange={(event) => setForm((current) => ({ ...current, show_in_list: event.target.checked }))}
+                    />
+                  }
+                  label="In list"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={form.show_as_column}
+                      disabled={saving}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, show_as_column: event.target.checked }))
+                      }
+                    />
+                  }
+                  label="Column"
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={form.is_active}
+                      disabled={saving}
+                      onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
+                    />
+                  }
+                  label="Active"
+                />
+              </Box>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 2, pb: 1.5 }}>
+          <DialogActions sx={{ px: 2, pb: 1.5, pt: 1 }}>
             <Button onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
