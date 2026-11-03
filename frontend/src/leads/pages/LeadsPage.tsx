@@ -107,6 +107,17 @@ function todayDateInput() {
   return `${now.getFullYear()}-${month}-${day}`
 }
 
+const toolbarIconSx = {
+  bgcolor: 'primary.main',
+  color: '#fff',
+  width: 32,
+  height: 32,
+  borderRadius: '8px',
+  boxShadow: '0 4px 10px rgba(29,78,216,.2)',
+  '&:hover': { bgcolor: 'primary.dark' },
+  '&.Mui-disabled': { bgcolor: '#93c5fd', color: '#fff' },
+} as const
+
 function blankForm(projectId = ''): LeadForm {
   return {
     project_id: projectId,
@@ -465,9 +476,8 @@ export function LeadsPage() {
     if (form.full_name.trim().length < 2) next.full_name = 'Enter the lead name.'
     if (!form.mobile.trim()) next.mobile = 'Enter a mobile number.'
     if (!form.lead_source) next.lead_source = 'Choose a source.'
-    if (!form.next_followup_at || !localInputToIso(form.next_followup_at)) {
-      next.next_followup_at = 'Choose the next follow-up.'
-    }
+    if (!form.city.trim()) next.city = 'Enter a city.'
+    if (!form.enquiry_date.trim()) next.enquiry_date = 'Choose the enquiry date.'
     for (const field of activeFields) {
       if (!field.is_required) continue
       const value = form.extra_values[field.key]
@@ -505,7 +515,7 @@ export function LeadsPage() {
       call_summary: form.call_summary.trim() || null,
       status: form.status,
       priority: form.priority,
-      next_followup_at: localInputToIso(form.next_followup_at),
+      next_followup_at: form.next_followup_at.trim() ? localInputToIso(form.next_followup_at) : null,
       extra_values: extras,
     }
   }
@@ -628,8 +638,11 @@ export function LeadsPage() {
           <TextField
             label="City"
             value={form.city}
+            required
             fullWidth
             disabled={disabled}
+            error={Boolean(fieldErrors.city)}
+            helperText={fieldErrors.city}
             onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
           />
         </Stack>
@@ -639,9 +652,12 @@ export function LeadsPage() {
             label="Enquiry Date"
             type="date"
             value={form.enquiry_date}
+            required
             fullWidth
             disabled={disabled}
             InputLabelProps={{ shrink: true }}
+            error={Boolean(fieldErrors.enquiry_date)}
+            helperText={fieldErrors.enquiry_date}
             onChange={(event) => setForm((current) => ({ ...current, enquiry_date: event.target.value }))}
           />
           <TextField
@@ -711,12 +727,10 @@ export function LeadsPage() {
           label="Next follow-up"
           type="datetime-local"
           value={form.next_followup_at}
-          required
           fullWidth
           disabled={disabled}
           InputLabelProps={{ shrink: true }}
-          error={Boolean(fieldErrors.next_followup_at)}
-          helperText={fieldErrors.next_followup_at || 'When will you call them next?'}
+          helperText="Optional — when will you call them next?"
           onChange={(event) => setForm((current) => ({ ...current, next_followup_at: event.target.value }))}
         />
 
@@ -846,6 +860,46 @@ export function LeadsPage() {
           Leads
         </Typography>
         <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+          {canCreate ? (
+            <Tooltip title="Create lead">
+              <span>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  aria-label="Create lead"
+                  disabled={isSales && projects.length === 0}
+                  onClick={() => void openCreate()}
+                  sx={toolbarIconSx}
+                >
+                  <AddOutlinedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          ) : null}
+          {canCreate ? (
+            <Tooltip title="Import leads">
+              <span>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  aria-label="Import leads"
+                  disabled={isSales && projects.length === 0}
+                  onClick={() => {
+                    setError('')
+                    setNotice('')
+                    setImportResult(null)
+                    setImportFile(null)
+                    if (importInputRef.current) importInputRef.current.value = ''
+                    setImportProjectId(projectFilter || projects[0]?.id || '')
+                    setImportOpen(true)
+                  }}
+                  sx={toolbarIconSx}
+                >
+                  <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          ) : null}
           <Tooltip
             title={
               projects.length === 0
@@ -862,85 +916,20 @@ export function LeadsPage() {
                 aria-label="Manage fields"
                 disabled={projects.length === 0}
                 onClick={() => openFieldsDrawer()}
-                sx={{
-                  bgcolor: '#fff',
-                  color: 'primary.main',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  '&:hover': { bgcolor: '#eef2ff' },
-                }}
+                sx={toolbarIconSx}
               >
                 <TuneOutlinedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             </span>
           </Tooltip>
-          {canCreate ? (
-            <>
-              <Tooltip title="Import leads">
-                <span>
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    aria-label="Import leads"
-                    disabled={isSales && projects.length === 0}
-                    onClick={() => {
-                      setError('')
-                      setNotice('')
-                      setImportResult(null)
-                      setImportFile(null)
-                      if (importInputRef.current) importInputRef.current.value = ''
-                      setImportProjectId(projectFilter || projects[0]?.id || '')
-                      setImportOpen(true)
-                    }}
-                    sx={{
-                      bgcolor: '#fff',
-                      color: 'primary.main',
-                      width: 32,
-                      height: 32,
-                      borderRadius: '8px',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      '&:hover': { bgcolor: '#eef2ff' },
-                    }}
-                  >
-                    <FileUploadOutlinedIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Create lead">
-                <span>
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    aria-label="Create lead"
-                    disabled={isSales && projects.length === 0}
-                    onClick={() => void openCreate()}
-                    sx={{
-                      bgcolor: 'primary.main',
-                      color: '#fff',
-                      width: 32,
-                      height: 32,
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 10px rgba(29,78,216,.2)',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                    }}
-                  >
-                    <AddOutlinedIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </>
-          ) : null}
+          <ColumnChooser
+            columns={columnDefs}
+            visibility={columnVisibility}
+            onToggle={toggleColumn}
+            onReset={resetColumns}
+            solid
+          />
         </Stack>
-        <ColumnChooser
-          columns={columnDefs}
-          visibility={columnVisibility}
-          onToggle={toggleColumn}
-          onReset={resetColumns}
-        />
       </Stack>
 
       {isSales && projects.length === 0 ? (
@@ -1433,22 +1422,39 @@ export function LeadsPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      <Drawer
+        anchor="right"
         open={createOpen}
         onClose={closeCreateDialog}
-        fullScreen={phone}
-        fullWidth
-        maxWidth="sm"
-        scroll="paper"
-        PaperProps={{ sx: { maxHeight: phone ? '100%' : '90vh' } }}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 480, md: 520 },
+            boxSizing: 'border-box',
+          },
+        }}
       >
         <Box
           component="form"
           onSubmit={(event) => void onCreate(event)}
-          sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, maxHeight: '100%' }}
+          sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
         >
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1, flexShrink: 0 }}>
-            <Typography component="span" sx={{ flex: 1, minWidth: 0 }} noWrap fontWeight={700}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: 'center',
+              px: 2,
+              py: 1.5,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              position: 'sticky',
+              top: 0,
+              bgcolor: 'background.paper',
+              zIndex: 1,
+              flexShrink: 0,
+            }}
+          >
+            <Typography sx={{ flex: 1, minWidth: 0 }} noWrap fontWeight={700} fontSize={18}>
               {form.full_name.trim() || 'Create lead'}
             </Typography>
             <IconButton
@@ -1459,17 +1465,31 @@ export function LeadsPage() {
                 event.preventDefault()
                 closeCreateDialog()
               }}
-              edge="end"
               size="small"
               disabled={saving}
             >
               <CloseOutlinedIcon fontSize="small" />
             </IconButton>
-          </DialogTitle>
-          <DialogContent dividers sx={{ overflowY: 'auto', flex: '1 1 auto' }}>
+          </Stack>
+          <Box sx={{ flex: '1 1 auto', overflowY: 'auto', px: 2, py: 2, minHeight: 0 }}>
             {formFields(saving)}
-          </DialogContent>
-          <DialogActions sx={{ flexShrink: 0 }}>
+          </Box>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              justifyContent: 'flex-end',
+              px: 2,
+              py: 1.5,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              position: 'sticky',
+              bottom: 0,
+              bgcolor: 'background.paper',
+              zIndex: 1,
+              flexShrink: 0,
+            }}
+          >
             <Button
               type="button"
               onClick={(event) => {
@@ -1483,9 +1503,9 @@ export function LeadsPage() {
             <Button type="submit" variant="contained" disabled={saving || projects.length === 0}>
               Create
             </Button>
-          </DialogActions>
+          </Stack>
         </Box>
-      </Dialog>
+      </Drawer>
 
       <ReminderLeadDrawer
         lead={drawerLead}
@@ -1538,21 +1558,37 @@ export function LeadsPage() {
         PaperProps={{
           sx: {
             width: { xs: '100%', sm: 560, md: 720 },
-            p: 2,
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
           },
         }}
       >
-        <Stack spacing={1.5} sx={{ height: '100%' }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Typography variant="h2" sx={{ flex: 1, fontSize: 20, fontWeight: 700 }}>
-              Manage fields
-            </Typography>
-            <IconButton aria-label="Close manage fields" color="error" onClick={closeFieldsDrawer} size="small">
-              <CloseOutlinedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-          <Typography variant="body2" color="text.secondary">
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            alignItems: 'center',
+            px: 2,
+            py: 1.5,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            position: 'sticky',
+            top: 0,
+            bgcolor: 'background.paper',
+            zIndex: 1,
+            flexShrink: 0,
+          }}
+        >
+          <Typography variant="h2" sx={{ flex: 1, fontSize: 20, fontWeight: 700 }}>
+            Manage fields
+          </Typography>
+          <IconButton aria-label="Close manage fields" color="error" onClick={closeFieldsDrawer} size="small">
+            <CloseOutlinedIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+        <Box sx={{ flex: 1, overflowY: 'auto', px: 2, py: 1.5, minHeight: 0 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
             Active fields show on Create/Edit and Import. In list shows under the lead name (first 3). Separate column
             adds a real table column you can also toggle in the column chooser.
           </Typography>
@@ -1564,7 +1600,7 @@ export function LeadsPage() {
             onProjectChange={setManageProjectId}
             onChanged={() => void refreshFieldsAfterManage()}
           />
-        </Stack>
+        </Box>
       </Drawer>
     </Stack>
   )

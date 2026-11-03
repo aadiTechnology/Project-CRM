@@ -170,7 +170,16 @@ export function LeadFieldsManager({
 
   function validateForm(): boolean {
     const next: Record<string, string> = {}
-    if (form.label.trim().length < 2) next.label = 'Label must be 2 to 40 characters.'
+    const label = form.label.trim()
+    if (label.length < 2) next.label = 'Label must be 2 to 40 characters.'
+    else if (label.length > 40) next.label = 'Label must be 2 to 40 characters.'
+    else {
+      const duplicate = (data?.items ?? []).some(
+        (field) =>
+          field.id !== editing?.id && field.label.trim().toLowerCase() === label.toLowerCase(),
+      )
+      if (duplicate) next.label = 'A field with this name already exists. Choose a different name.'
+    }
     if (needsOptions && parseOptions(form.optionsText).length === 0) {
       next.optionsText = 'Add at least one option, one per line.'
     }
@@ -398,11 +407,11 @@ export function LeadFieldsManager({
             >
               <Stack spacing={1}>
                 <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography fontWeight={700} noWrap>
+                  <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                    <Typography fontWeight={700} sx={{ wordBreak: 'break-word' }}>
                       {field.label}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ wordBreak: 'break-word' }}>
                       {field.key} · {field.field_type_label}
                     </Typography>
                   </Box>
@@ -577,11 +586,11 @@ export function LeadFieldsManager({
                       </Tooltip>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ overflow: 'hidden' }}>
-                    <Typography fontWeight={700} noWrap>
+                  <TableCell sx={{ maxWidth: 220 }}>
+                    <Typography fontWeight={700} sx={{ wordBreak: 'break-word' }}>
                       {field.label}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ wordBreak: 'break-word' }}>
                       {field.key}
                       {field.options?.length ? ` · ${field.options.join(', ')}` : ''}
                       {field.leads_with_data ? ` · ${field.leads_with_data} leads` : ''}
@@ -667,25 +676,28 @@ export function LeadFieldsManager({
         </Box>
       )}
 
-      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="xs">
         <Box component="form" onSubmit={onSaveField}>
-          <DialogTitle>{editing ? 'Edit field' : 'Add field'}</DialogTitle>
-          <DialogContent>
-            <Stack spacing={2} sx={{ pt: 0.5 }}>
+          <DialogTitle sx={{ py: 1.5, fontSize: 18 }}>{editing ? 'Edit field' : 'Add field'}</DialogTitle>
+          <DialogContent sx={{ pt: 0.5, pb: 1 }}>
+            <Stack spacing={1.5} sx={{ pt: 0.5 }}>
               <TextField
                 label="Field label"
                 value={form.label}
                 required
                 fullWidth
+                size="small"
                 autoFocus
                 disabled={saving}
                 error={Boolean(fieldErrors.label)}
-                helperText={fieldErrors.label}
+                helperText={fieldErrors.label || 'Must be unique for this project'}
+                inputProps={{ maxLength: 40 }}
                 onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
               />
               <TextField
                 select
-                label={typeLocked ? 'Field type (locked, leads already hold data)' : 'Field type'}
+                size="small"
+                label={typeLocked ? 'Field type (locked)' : 'Field type'}
                 value={form.field_type}
                 fullWidth
                 disabled={saving || typeLocked}
@@ -704,57 +716,62 @@ export function LeadFieldsManager({
                   label="Options, one per line"
                   value={form.optionsText}
                   fullWidth
+                  size="small"
                   multiline
-                  minRows={3}
+                  minRows={2}
                   disabled={saving}
                   error={Boolean(fieldErrors.optionsText)}
-                  helperText={fieldErrors.optionsText || 'Used for Dropdown, Multi-select, and Radio.'}
+                  helperText={fieldErrors.optionsText || 'Dropdown / Multi-select / Radio'}
                   onChange={(event) => setForm((current) => ({ ...current, optionsText: event.target.value }))}
                 />
               ) : null}
               <FormControlLabel
                 control={
                   <Checkbox
+                    size="small"
                     checked={form.is_required}
                     disabled={saving}
                     onChange={(event) => setForm((current) => ({ ...current, is_required: event.target.checked }))}
                   />
                 }
-                label="Required — must be filled to save a lead"
+                label="Required"
               />
               <FormControlLabel
                 control={
                   <Checkbox
+                    size="small"
                     checked={form.show_in_list}
                     disabled={saving}
                     onChange={(event) => setForm((current) => ({ ...current, show_in_list: event.target.checked }))}
                   />
                 }
-                label="In list — show under the lead name on the Leads screen"
+                label="In list"
               />
               <FormControlLabel
                 control={
                   <Checkbox
+                    size="small"
                     checked={form.show_as_column}
                     disabled={saving}
                     onChange={(event) => setForm((current) => ({ ...current, show_as_column: event.target.checked }))}
                   />
                 }
-                label="Separate column — own column on the Leads table"
+                label="Separate column"
               />
               <FormControlLabel
                 control={
                   <Checkbox
+                    size="small"
                     checked={form.is_active}
                     disabled={saving}
                     onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))}
                   />
                 }
-                label="Active — shown in forms"
+                label="Active"
               />
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
+          <DialogActions sx={{ px: 2, pb: 1.5 }}>
             <Button onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>

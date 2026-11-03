@@ -65,7 +65,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'leads', path: '/app/leads', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: PersonSearchOutlinedIcon },
   { id: 'pipeline', path: '/app/pipeline', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AccountTreeOutlinedIcon },
   { id: 'followUps', path: '/app/follow-ups', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: TaskAltOutlinedIcon },
-  { id: 'kpis', path: '/app/kpis', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AssessmentOutlinedIcon },
+  // KPIs hidden from sidebar for now (route still available)
+  { id: 'kpis', path: '/app/kpis', section: 'menu', roles: [...OWNER, ...SALES], ready: false, icon: AssessmentOutlinedIcon },
   { id: 'campaigns', path: '/app/campaigns', section: 'menu', roles: MARKETING, icon: CampaignOutlinedIcon },
 ]
 
@@ -94,6 +95,7 @@ export function homePathForRoles(roles: readonly string[]): string {
 
 export function visibleNav(roles: readonly string[], permissions: readonly string[] = []): NavItem[] {
   return NAV_ITEMS.filter((item) => {
+    if (item.ready === false) return false
     if (item.always) return true
     if (item.roles.some((role) => roles.includes(role))) return true
     return item.permission ? permissions.includes(item.permission) : false

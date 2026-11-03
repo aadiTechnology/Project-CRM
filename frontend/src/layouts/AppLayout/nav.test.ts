@@ -27,7 +27,6 @@ describe('visibleNav', () => {
       'leads',
       'pipeline',
       'followUps',
-      'kpis',
     ])
   })
 
@@ -39,7 +38,6 @@ describe('visibleNav', () => {
       'leads',
       'pipeline',
       'followUps',
-      'kpis',
     ])
   })
 

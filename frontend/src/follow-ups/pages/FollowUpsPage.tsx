@@ -26,7 +26,6 @@ import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import {
-  CUSTOM_STEP,
   FollowupPlanStep,
   gapForStep,
   loadFollowupPlan,
@@ -48,8 +47,6 @@ import { useAuth } from '../../store/auth-context'
 
 type SessionTally = { connected: number; noAnswer: number; snoozed: number; skipped: number }
 
-const STEP_PALETTE = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6', '#64748b', '#0ea5e9', '#f43f5e']
-
 const actionIconSx = {
   width: 30,
   height: 30,
@@ -57,12 +54,6 @@ const actionIconSx = {
   color: 'text.secondary',
   '&:hover': { bgcolor: '#eef2f7', color: 'text.primary' },
 } as const
-
-function stepColor(label: string, plan: FollowupPlanStep[]) {
-  const index = plan.findIndex((step) => step.label === label)
-  if (label === CUSTOM_STEP) return STEP_PALETTE[5]
-  return STEP_PALETTE[index >= 0 ? index % STEP_PALETTE.length : 0]
-}
 
 function dueDisplay(lead: Lead) {
   const when = followWhen(lead.next_followup_at)
@@ -374,8 +365,6 @@ export function FollowUpsPage() {
           filtered.map((lead) => {
             const due = dueDisplay(lead)
             const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
-            const planLabel = lead.plan_step || plan[0]?.label || 'Day 1'
-            const color = stepColor(planLabel, plan)
             return (
               <Box
                 key={lead.id}
@@ -405,8 +394,8 @@ export function FollowUpsPage() {
                       flexShrink: 0,
                       display: 'grid',
                       placeItems: 'center',
-                      bgcolor: `color-mix(in srgb, ${color} 14%, #fff)`,
-                      color,
+                      bgcolor: '#fce4ec',
+                      color: '#e95d90',
                     }}
                   >
                     <PhoneInTalkOutlinedIcon sx={{ fontSize: 20 }} />

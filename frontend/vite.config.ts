@@ -7,6 +7,14 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // Same-origin /api avoids CSRF cookie failures when the tab is
+    // localhost:5173 but the API is 127.0.0.1:8000 (cross-site cookies).
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
     watch: {
       // Avoid random full reloads from unrelated folders / antivirus file touches.
       ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/coverage/**'],
@@ -18,7 +26,7 @@ export default defineConfig({
     css: true,
     fileParallelism: false,
     env: {
-      VITE_API_BASE_URL: 'http://127.0.0.1:8000',
+      VITE_API_BASE_URL: '',
       VITE_DEFAULT_LANGUAGE: 'en',
     },
   },

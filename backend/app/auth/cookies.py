@@ -44,8 +44,11 @@ def clear_session_cookies(response: Response) -> None:
     )
 
 
-def ensure_csrf_cookie(response: Response, existing: str | None) -> str:
-    token = existing or generate_csrf_token()
+def ensure_csrf_cookie(response: Response, existing: str | None = None) -> str:
+    # Always mint a fresh token so the JSON body and Set-Cookie stay in sync
+    # (avoids stale in-memory header tokens after logout / HMR / proxy changes).
+    _ = existing
+    token = generate_csrf_token()
     flags = _cookie_flags()
     response.set_cookie(
         CSRF_COOKIE,

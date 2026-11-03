@@ -21,8 +21,12 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler
 }
 
-export async function ensureCsrf(): Promise<void> {
-  if (csrfToken) {
+export function clearCsrf() {
+  csrfToken = null
+}
+
+export async function ensureCsrf(force = false): Promise<void> {
+  if (csrfToken && !force) {
     return
   }
   const response = await fetch(`${baseUrl}/api/v1/auth/csrf`, {

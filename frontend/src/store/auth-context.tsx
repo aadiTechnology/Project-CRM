@@ -11,7 +11,7 @@ import {
 
 import type { LoginInput, RegisterInput, UserProfile } from '../auth/types'
 import { ApiError } from '../services/api/errors'
-import { api, ensureCsrf, setUnauthorizedHandler } from '../services/api/client'
+import { api, clearCsrf, ensureCsrf, setUnauthorizedHandler } from '../services/api/client'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -82,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(async (input: LoginInput) => {
+    await ensureCsrf(true)
     const result = await api.post<UserProfile>('/api/v1/auth/login', input)
     setUser(result.data)
     setStatus('authenticated')
@@ -89,14 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(async (input: RegisterInput) => {
+    await ensureCsrf(true)
     const result = await api.post<UserProfile>('/api/v1/auth/register', input)
     return result.message
   }, [])
 
   const logout = useCallback(async () => {
-    await api.post<undefined>('/api/v1/auth/logout')
-    setUser(null)
-    setStatus('unauthenticated')
+    try {
+      await ensureCsrf(true)
+      await api.post<undefined>('/api/v1/auth/logout')
+    } finally {
+      clearCsrf()
+      setUser(null)
+      setStatus('unauthenticated')
+    }
   }, [])
 
   const refreshUser = useCallback(async () => {
