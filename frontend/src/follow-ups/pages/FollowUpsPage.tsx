@@ -1,9 +1,9 @@
 import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
+import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
 import {
   Box,
   Button,
   Chip,
-  Link,
   MenuItem,
   Stack,
   TextField,
@@ -88,6 +88,26 @@ const DUE_FILTERS: { id: DueFilter; label: string }[] = [
   { id: 't', label: 'Today' },
   { id: 'u', label: 'Upcoming' },
 ]
+
+const FOLLOWUPS_GRID_MD =
+  'minmax(0,1.4fr) 120px 84px minmax(0,1.15fr) minmax(120px,140px) 88px'
+const FOLLOWUPS_GRID_XS = '1fr'
+
+function ToneChip({ label, bg, color }: { label: string; bg?: string; color?: string }) {
+  return (
+    <Chip
+      size="small"
+      label={label || '—'}
+      sx={{
+        bgcolor: bg ?? '#f1f5f9',
+        color: color ?? '#475569',
+        fontWeight: 600,
+        height: 24,
+        borderRadius: '999px',
+      }}
+    />
+  )
+}
 
 export function FollowUpsPage() {
   const theme = useTheme()
@@ -219,18 +239,14 @@ export function FollowUpsPage() {
     [load],
   )
 
-  const gridTemplate = phone
-    ? '1fr'
-    : 'minmax(0,1.35fr) 104px minmax(0,1.15fr) minmax(168px,0.95fr)'
-
   if (loading && items.length === 0) return <LoadingScreen />
 
   return (
     <Stack spacing={1.25}>
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h1">Follow-up List</Typography>
-        </Box>
+        <Typography variant="h1" sx={{ flex: 1, minWidth: 0 }}>
+          Follow-up List
+        </Typography>
         <Chip
           label={`${filtered.length} Follow-up${filtered.length === 1 ? '' : 's'}`}
           sx={{
@@ -355,45 +371,36 @@ export function FollowUpsPage() {
           boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
         }}
       >
-        <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
-          <Box sx={{ minWidth: { md: 760 }, width: '100%' }}>
-            {!phone ? (
+        {filtered.length === 0 ? (
+          <Typography color="text.secondary" sx={{ p: 3 }}>
+            {search.trim() || dueFilter !== 'ALL' || dateFrom || dateTo
+              ? 'No follow-ups match these filters.'
+              : 'When a lead has a next follow-up date, it appears here for the salesperson.'}
+          </Typography>
+        ) : (
+          <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
+            <Box sx={{ minWidth: { md: 820 } }}>
               <Box
                 sx={{
-                  display: 'grid',
-                  gridTemplateColumns: gridTemplate,
-                  columnGap: 2,
+                  display: { xs: 'none', md: 'grid' },
+                  gridTemplateColumns: FOLLOWUPS_GRID_MD,
+                  columnGap: 1.25,
                   alignItems: 'center',
-                  px: 2.25,
-                  py: 1.15,
+                  px: 2,
+                  py: 1,
                   bgcolor: '#f8fafc',
-                  borderBottom: '1px solid #e2e8f0',
                 }}
               >
-                <Typography sx={columnHeaderSx}>Customer</Typography>
+                <Typography sx={columnHeaderSx}>Lead</Typography>
+                <Typography sx={columnHeaderSx}>Phone</Typography>
                 <Typography sx={columnHeaderSx}>Priority</Typography>
                 <Typography sx={columnHeaderSx}>Last Remark</Typography>
-                <Typography sx={columnHeaderSx}>Next Follow-up</Typography>
+                <Typography sx={columnHeaderSx}>Follow-up</Typography>
+                <Typography sx={{ ...columnHeaderSx, textAlign: 'right' }}>Actions</Typography>
               </Box>
-            ) : null}
 
-            {filtered.length === 0 ? (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography fontWeight={700} sx={{ mb: 0.5 }}>
-                  {search.trim() || dueFilter !== 'ALL' || dateFrom || dateTo
-                    ? 'No follow-ups match'
-                    : 'No follow-ups due'}
-                </Typography>
-                <Typography color="text.secondary" variant="body2">
-                  {search.trim() || dueFilter !== 'ALL' || dateFrom || dateTo
-                    ? 'Try another filter or clear search.'
-                    : 'When a lead has a next follow-up date, it appears here for the salesperson.'}
-                </Typography>
-              </Box>
-            ) : (
-              filtered.map((lead) => {
+              {filtered.map((lead) => {
                 const priorityKey: LeadPriority = lead.priority in PRIORITY_TONE ? lead.priority : 'medium'
-                const tone = PRIORITY_TONE[priorityKey]
                 const remark = lastRemark(lead)
                 const next = nextFollowupMeta(lead)
                 const channel = channelForLead(lead)
@@ -405,85 +412,49 @@ export function FollowUpsPage() {
                     onClick={() => setDrawerLeadId(lead.id)}
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: gridTemplate,
-                      columnGap: phone ? 1 : 2,
-                      rowGap: 0.85,
+                      gridTemplateColumns: {
+                        xs: FOLLOWUPS_GRID_XS,
+                        md: FOLLOWUPS_GRID_MD,
+                      },
+                      columnGap: 1.25,
+                      rowGap: 0.75,
                       alignItems: 'center',
-                      px: 2.25,
-                      py: 1.4,
-                      borderBottom: '1px solid #edf1f7',
+                      px: 2,
+                      py: 1.15,
                       cursor: 'pointer',
                       bgcolor: next.overdue ? '#fffbfb' : 'transparent',
                       '&:hover': { bgcolor: next.overdue ? '#fff5f5' : '#f8fbff' },
-                      '&:last-child': { borderBottom: 0 },
                     }}
                   >
-                    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
-                      <Typography fontWeight={700} noWrap sx={{ color: '#0f172a' }}>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={700} noWrap>
                         {lead.full_name}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap display="block">
                         {lead.lead_number}
                         {lead.project_name ? ` · ${lead.project_name}` : ''}
                       </Typography>
-                      {lead.mobile ? (
-                        <Typography
-                          variant="caption"
-                          component={Link}
-                          href={`tel:${tel}`}
-                          onClick={(event) => event.stopPropagation()}
-                          underline="hover"
-                          noWrap
-                          display="block"
-                          sx={{ color: 'primary.main', fontWeight: 600, width: 'fit-content', maxWidth: '100%' }}
-                        >
-                          {lead.mobile}
-                        </Typography>
-                      ) : null}
                       {phone ? (
-                        <Chip
-                          size="small"
-                          label={PRIORITY_LABEL[priorityKey]}
-                          sx={{
-                            mt: 0.75,
-                            height: 24,
-                            fontWeight: 700,
-                            bgcolor: tone.bg,
-                            color: tone.color,
-                          }}
-                        />
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                          {remark.title}
+                        </Typography>
                       ) : null}
                     </Box>
 
-                    {!phone ? (
-                      <Box sx={{ minWidth: 0, display: 'flex', alignItems: 'center' }}>
-                        <Chip
-                          size="small"
-                          label={PRIORITY_LABEL[priorityKey]}
-                          sx={{
-                            height: 24,
-                            maxWidth: '100%',
-                            fontWeight: 700,
-                            bgcolor: tone.bg,
-                            color: tone.color,
-                          }}
-                        />
-                      </Box>
-                    ) : null}
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'primary.main', fontWeight: 600 }}
+                    >
+                      {lead.mobile || '—'}
+                    </Typography>
 
-                    <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
-                      {phone ? (
-                        <Typography
-                          variant="caption"
-                          fontWeight={700}
-                          color="text.secondary"
-                          display="block"
-                          sx={{ mb: 0.25 }}
-                        >
-                          Last remark
-                        </Typography>
-                      ) : null}
-                      <Typography fontWeight={600} noWrap title={remark.title} sx={{ color: '#0f172a' }}>
+                    <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
+                      <ToneChip label={PRIORITY_LABEL[priorityKey]} {...PRIORITY_TONE[priorityKey]} />
+                    </Box>
+
+                    <Box sx={{ minWidth: 0, gridColumn: { xs: '1', md: 'auto' } }}>
+                      <Typography variant="body2" noWrap title={remark.title} sx={{ fontWeight: 600 }}>
                         {remark.title}
                       </Typography>
                       {remark.detail ? (
@@ -493,55 +464,66 @@ export function FollowUpsPage() {
                       ) : null}
                     </Box>
 
-                    <Stack spacing={0.65} sx={{ minWidth: 0, overflow: 'hidden' }}>
-                      {phone ? (
-                        <Typography variant="caption" fontWeight={700} color="text.secondary" display="block">
-                          Next follow-up
-                        </Typography>
-                      ) : null}
-                      <Typography
-                        variant="body2"
-                        fontWeight={next.overdue || next.today ? 700 : 600}
-                        noWrap
-                        title={next.text}
-                        sx={{ color: next.overdue ? '#b91c1c' : '#0f172a' }}
-                      >
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{
+                        alignItems: 'center',
+                        gridColumn: { xs: '1', md: 'auto' },
+                        fontSize: 13,
+                        color: next.overdue ? '#b91c1c' : 'text.secondary',
+                        fontWeight: next.overdue || next.today ? 700 : 500,
+                        whiteSpace: 'nowrap',
+                        minWidth: 0,
+                      }}
+                    >
+                      <TodayOutlinedIcon sx={{ fontSize: 15, flexShrink: 0 }} />
+                      <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }} title={next.text}>
                         {next.text}
-                      </Typography>
+                      </Box>
+                    </Stack>
+
+                    <Box
+                      sx={{
+                        justifySelf: { xs: 'start', md: 'end' },
+                        gridColumn: { xs: '1', md: 'auto' },
+                      }}
+                      onClick={(event: MouseEvent) => event.stopPropagation()}
+                    >
                       <Chip
                         size="small"
                         component={tel && channel === 'call' ? 'a' : 'div'}
                         href={tel && channel === 'call' ? `tel:${tel}` : undefined}
                         clickable={Boolean(tel && channel === 'call')}
-                        onClick={(event: MouseEvent) => event.stopPropagation()}
                         icon={
                           channel === 'call' ? (
                             <PhoneOutlinedIcon sx={{ fontSize: '14px !important' }} />
                           ) : undefined
                         }
-                        label={channel === 'whatsapp' ? 'WhatsApp' : 'Call'}
+                        label={channel === 'whatsapp' ? 'WA' : 'Call'}
                         sx={{
-                          alignSelf: 'flex-start',
                           height: 24,
-                          fontWeight: 700,
+                          fontWeight: 600,
                           textDecoration: 'none',
                           bgcolor: '#fce4ec',
                           color: '#e95d90',
                           '& .MuiChip-icon': { color: '#e95d90' },
                         }}
                       />
-                    </Stack>
+                    </Box>
                   </Box>
                 )
-              })
-            )}
+              })}
+            </Box>
           </Box>
-        </Box>
-      </Box>
+        )}
 
-      <Typography variant="caption" color="text.secondary">
-        Tap a row to open the lead. Use Reminders for quick call outcomes.
-      </Typography>
+        <Stack direction="row" spacing={1} sx={{ px: 2, py: 1.5, alignItems: 'center', color: 'text.secondary' }}>
+          <Typography variant="body2" sx={{ flex: 1 }}>
+            Showing {filtered.length} of {rangedItems.length} follow-ups
+          </Typography>
+        </Stack>
+      </Box>
 
       <ReminderLeadDrawer
         lead={drawerLead}
