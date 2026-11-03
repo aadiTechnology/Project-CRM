@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'reac
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { columnHeaderSx } from '../../components/common/tableStyles'
 import { resolveCallSummary } from '../../lead-fields/builtinLabels'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
@@ -305,19 +306,6 @@ export function FollowUpsPage() {
           onChange={(event) => setDateTo(event.target.value)}
           sx={{ width: { xs: '100%', sm: 150 } }}
         />
-        {dateFrom || dateTo ? (
-          <Button
-            size="small"
-            disabled={!projectId}
-            onClick={() => {
-              setDateFrom('')
-              setDateTo('')
-            }}
-            sx={{ textTransform: 'none', fontWeight: 600, minHeight: 40, flexShrink: 0 }}
-          >
-            Clear dates
-          </Button>
-        ) : null}
         <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" sx={{ ml: { sm: 'auto' } }}>
           {DUE_FILTERS.map((item) => {
             const count =
@@ -380,18 +368,10 @@ export function FollowUpsPage() {
               borderBottom: '1px solid #e2e8f0',
             }}
           >
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Customer
-            </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Priority
-            </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Last Remark
-            </Typography>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">
-              Next Follow-up
-            </Typography>
+            <Typography sx={columnHeaderSx}>Customer</Typography>
+            <Typography sx={columnHeaderSx}>Priority</Typography>
+            <Typography sx={columnHeaderSx}>Last Remark</Typography>
+            <Typography sx={columnHeaderSx}>Next Follow-up</Typography>
           </Box>
         ) : null}
 

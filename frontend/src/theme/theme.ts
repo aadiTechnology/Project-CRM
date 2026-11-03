@@ -168,6 +168,17 @@ export const theme = createTheme({
         standardError: { backgroundColor: '#fef2f2', color: '#b91c1c' },
       },
     },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          fontWeight: 800,
+          fontSize: 13,
+          color: '#0f172a',
+          letterSpacing: '0.01em',
+          backgroundColor: '#f8fafc',
+        },
+      },
+    },
     MuiMenu: {
       styleOverrides: {
         paper: {

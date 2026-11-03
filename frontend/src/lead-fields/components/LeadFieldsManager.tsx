@@ -514,10 +514,11 @@ export function LeadFieldsManager({
                 verticalAlign: 'middle',
               },
               '& th': {
-                fontWeight: 700,
-                color: 'text.secondary',
+                fontWeight: 800,
+                color: '#0f172a',
                 bgcolor: '#f8fafc',
-                fontSize: 12,
+                fontSize: 13,
+                letterSpacing: '0.01em',
               },
             }}
           >

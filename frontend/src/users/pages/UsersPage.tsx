@@ -356,11 +356,11 @@ export function UsersPage() {
         >
           <TableHead>
             <TableRow sx={{ bgcolor: '#f8fafc' }}>
-              <TableCell sx={{ fontWeight: 700, width: '28%' }}>{t('access:name')}</TableCell>
-              <TableCell sx={{ fontWeight: 700, width: '18%' }}>{t('access:organisation')}</TableCell>
-              <TableCell sx={{ fontWeight: 700, width: '18%' }}>{t('access:role')}</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>{t('access:status')}</TableCell>
-              <TableCell sx={{ fontWeight: 700, width: 120 }} align="right">
+              <TableCell sx={{ width: '28%' }}>{t('access:name')}</TableCell>
+              <TableCell sx={{ width: '18%' }}>{t('access:organisation')}</TableCell>
+              <TableCell sx={{ width: '18%' }}>{t('access:role')}</TableCell>
+              <TableCell>{t('access:status')}</TableCell>
+              <TableCell sx={{ width: 120 }} align="right">
                 {t('access:actions')}
               </TableCell>
             </TableRow>

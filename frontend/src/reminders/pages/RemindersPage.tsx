@@ -33,6 +33,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { columnHeaderSx } from '../../components/common/tableStyles'
 import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import {
@@ -579,37 +580,13 @@ export function RemindersPage() {
                 inputProps={{ 'aria-label': 'Select all on page' }}
                 sx={{ p: 0.25 }}
               />
-              <Typography variant="caption" fontWeight={700} color="text.secondary">
-                Lead
-              </Typography>
-              {isColumnVisible('project') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Project
-                </Typography>
-              ) : null}
-              {isColumnVisible('phone') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Phone
-                </Typography>
-              ) : null}
-              {isColumnVisible('priority') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Priority
-                </Typography>
-              ) : null}
-              {isColumnVisible('due') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Due
-                </Typography>
-              ) : null}
-              {isColumnVisible('status') ? (
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Status
-                </Typography>
-              ) : null}
-              <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="left">
-                Actions
-              </Typography>
+              <Typography sx={columnHeaderSx}>Lead</Typography>
+              {isColumnVisible('project') ? <Typography sx={columnHeaderSx}>Project</Typography> : null}
+              {isColumnVisible('phone') ? <Typography sx={columnHeaderSx}>Phone</Typography> : null}
+              {isColumnVisible('priority') ? <Typography sx={columnHeaderSx}>Priority</Typography> : null}
+              {isColumnVisible('due') ? <Typography sx={columnHeaderSx}>Due</Typography> : null}
+              {isColumnVisible('status') ? <Typography sx={columnHeaderSx}>Status</Typography> : null}
+              <Typography sx={{ ...columnHeaderSx, textAlign: 'left' }}>Actions</Typography>
             </Box>
 
             {pageRows.map((lead) => {

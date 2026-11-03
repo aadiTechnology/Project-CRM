@@ -34,6 +34,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
+import { columnHeaderSx } from '../../components/common/tableStyles'
 import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
@@ -1087,55 +1088,21 @@ export function LeadsPage() {
                   bgcolor: '#f8fafc',
                 }}
               >
-                <Typography variant="caption" fontWeight={700} color="text.secondary">
-                  Lead
-                </Typography>
-                {isColumnVisible('project') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Project
-                  </Typography>
-                ) : null}
-                {isColumnVisible('phone') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Phone
-                  </Typography>
-                ) : null}
-                {isColumnVisible('status') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Status
-                  </Typography>
-                ) : null}
-                {isColumnVisible('priority') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Priority
-                  </Typography>
-                ) : null}
-                {isColumnVisible('follow_up') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Follow-up
-                  </Typography>
-                ) : null}
-                {isColumnVisible('source') ? (
-                  <Typography variant="caption" fontWeight={700} color="text.secondary">
-                    Source
-                  </Typography>
-                ) : null}
+                <Typography sx={columnHeaderSx}>Lead</Typography>
+                {isColumnVisible('project') ? <Typography sx={columnHeaderSx}>Project</Typography> : null}
+                {isColumnVisible('phone') ? <Typography sx={columnHeaderSx}>Phone</Typography> : null}
+                {isColumnVisible('status') ? <Typography sx={columnHeaderSx}>Status</Typography> : null}
+                {isColumnVisible('priority') ? <Typography sx={columnHeaderSx}>Priority</Typography> : null}
+                {isColumnVisible('follow_up') ? <Typography sx={columnHeaderSx}>Follow-up</Typography> : null}
+                {isColumnVisible('source') ? <Typography sx={columnHeaderSx}>Source</Typography> : null}
                 {columnFieldsUnion.map((field) =>
                   isColumnVisible(`extra:${field.key}`) ? (
-                    <Typography
-                      key={field.id}
-                      variant="caption"
-                      fontWeight={700}
-                      color="text.secondary"
-                      noWrap
-                    >
+                    <Typography key={field.id} noWrap sx={columnHeaderSx}>
                       {field.label}
                     </Typography>
                   ) : null,
                 )}
-                <Typography variant="caption" fontWeight={700} color="text.secondary" textAlign="right">
-                  Actions
-                </Typography>
+                <Typography sx={{ ...columnHeaderSx, textAlign: 'right' }}>Actions</Typography>
               </Box>
               {pageRows.map((lead) => {
                 const clickable = canUpdate || isOwner
