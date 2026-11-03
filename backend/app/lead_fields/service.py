@@ -119,6 +119,15 @@ def _unique_key(db: Session, project_id: uuid.UUID, label: str) -> str:
         index += 1
 
 
+def _normalize_label(label: str) -> str:
+    return " ".join(label.split()).casefold()
+
+
+def _common_label_taken(label: str) -> bool:
+    target = _normalize_label(label)
+    return any(_normalize_label(name) == target for name in COMMON_FIELDS)
+
+
 def _label_taken(
     db: Session,
     project_id: uuid.UUID,
@@ -126,13 +135,37 @@ def _label_taken(
     *,
     excluding_id: uuid.UUID | None = None,
 ) -> bool:
-    stmt = select(LeadField.id).where(
-        LeadField.project_id == project_id,
-        func.lower(LeadField.label) == label.lower(),
-    )
-    if excluding_id is not None:
-        stmt = stmt.where(LeadField.id != excluding_id)
-    return db.scalar(stmt) is not None
+    target = _normalize_label(label)
+    rows = db.execute(
+        select(LeadField.id, LeadField.label).where(LeadField.project_id == project_id)
+    ).all()
+    for field_id, existing_label in rows:
+        if excluding_id is not None and field_id == excluding_id:
+            continue
+        if _normalize_label(str(existing_label)) == target:
+            return True
+    return False
+
+
+def _assert_label_available(
+    db: Session,
+    project_id: uuid.UUID,
+    label: str,
+    *,
+    excluding_id: uuid.UUID | None = None,
+) -> None:
+    if _common_label_taken(label):
+        raise _validation(
+            "label",
+            "DUPLICATE",
+            "This name is already used by a built-in lead column. Choose a different name.",
+        )
+    if _label_taken(db, project_id, label, excluding_id=excluding_id):
+        raise _validation(
+            "label",
+            "DUPLICATE",
+            "A field with this name already exists in this project. Choose a different name.",
+        )
 
 
 def _leads_with_data_counts(db: Session, project_id: uuid.UUID, keys: list[str]) -> dict[str, int]:
@@ -194,8 +227,7 @@ def create_field(
     ip_address: str | None,
 ) -> LeadField:
     project = _accessible_project(db, actor, payload.project_id)
-    if _label_taken(db, project.id, payload.label):
-        raise _validation("label", "DUPLICATE", "A field with this label already exists in this project.")
+    _assert_label_available(db, project.id, payload.label)
     max_order = db.scalar(
         select(func.coalesce(func.max(LeadField.sort_order), 0)).where(LeadField.project_id == project.id)
     )
@@ -253,8 +285,7 @@ def update_field(
     used = counts.get(field.key, 0)
 
     if "label" in fields_set and payload.label is not None:
-        if _label_taken(db, field.project_id, payload.label, excluding_id=field.id):
-            raise _validation("label", "DUPLICATE", "A field with this label already exists in this project.")
+        _assert_label_available(db, field.project_id, payload.label, excluding_id=field.id)
         field.label = payload.label
     if "field_type" in fields_set and payload.field_type is not None:
         if used > 0 and payload.field_type != field.field_type:

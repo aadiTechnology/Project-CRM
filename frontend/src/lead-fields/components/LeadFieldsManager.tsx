@@ -98,6 +98,14 @@ function parseOptions(text: string): string[] {
     .filter(Boolean)
 }
 
+function collapseLabel(value: string) {
+  return value.trim().replace(/\s+/g, ' ')
+}
+
+function normalizeLabel(value: string) {
+  return collapseLabel(value).toLowerCase()
+}
+
 export function LeadFieldsManager({
   projectId,
   projects = [],
@@ -171,15 +179,22 @@ export function LeadFieldsManager({
 
   function validateForm(): boolean {
     const next: Record<string, string> = {}
-    const label = form.label.trim()
+    const label = collapseLabel(form.label)
     if (label.length < 2) next.label = 'Label must be 2 to 40 characters.'
     else if (label.length > 40) next.label = 'Label must be 2 to 40 characters.'
     else {
-      const duplicate = (data?.items ?? []).some(
-        (field) =>
-          field.id !== editing?.id && field.label.trim().toLowerCase() === label.toLowerCase(),
+      const key = normalizeLabel(label)
+      const duplicateCustom = (data?.items ?? []).some(
+        (field) => field.id !== editing?.id && normalizeLabel(field.label) === key,
       )
-      if (duplicate) next.label = 'A field with this name already exists. Choose a different name.'
+      const duplicateCommon = (data?.common_fields ?? []).some(
+        (name) => normalizeLabel(name) === key,
+      )
+      if (duplicateCommon) {
+        next.label = 'This name is already used by a built-in lead column. Choose a different name.'
+      } else if (duplicateCustom) {
+        next.label = 'A field with this name already exists. Choose a different name.'
+      }
     }
     if (needsOptions && parseOptions(form.optionsText).length === 0) {
       next.optionsText = 'Add at least one option, one per line.'
@@ -195,7 +210,7 @@ export function LeadFieldsManager({
     setError('')
     setNotice('')
     const body = {
-      label: form.label.trim(),
+      label: collapseLabel(form.label),
       field_type: form.field_type,
       options: needsOptions ? parseOptions(form.optionsText) : null,
       is_required: form.is_required,
@@ -673,9 +688,20 @@ export function LeadFieldsManager({
                 autoFocus
                 disabled={saving}
                 error={Boolean(fieldErrors.label)}
-                helperText={fieldErrors.label || 'Must be unique for this project'}
+                helperText={
+                  fieldErrors.label || 'Must be unique — cannot match another field or a built-in column'
+                }
                 inputProps={{ maxLength: 40 }}
-                onChange={(event) => setForm((current) => ({ ...current, label: event.target.value }))}
+                onChange={(event) => {
+                  setForm((current) => ({ ...current, label: event.target.value }))
+                  if (fieldErrors.label) {
+                    setFieldErrors((current) => {
+                      const next = { ...current }
+                      delete next.label
+                      return next
+                    })
+                  }
+                }}
               />
               <TextField
                 select
