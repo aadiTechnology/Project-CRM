@@ -117,6 +117,16 @@ export const theme = createTheme({
             transform: 'translate(14px, -9px) scale(0.75)',
           },
         },
+        asterisk: {
+          color: '#b91c1c',
+        },
+      },
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        asterisk: {
+          color: '#b91c1c',
+        },
       },
     },
     MuiFormControlLabel: {

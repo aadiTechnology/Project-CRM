@@ -260,7 +260,7 @@ export function FollowUpsPage() {
   if (loading && items.length === 0) return <LoadingScreen />
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={1.25}>
       <Stack spacing={0.75}>
         <Typography variant="h1">Follow-ups</Typography>
         <Typography color="text.secondary" sx={{ maxWidth: 760, lineHeight: 1.55 }}>

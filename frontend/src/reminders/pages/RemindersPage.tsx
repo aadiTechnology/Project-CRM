@@ -891,7 +891,7 @@ export function RemindersPage() {
             <Typography variant="h6" sx={{ flex: 1 }}>
               Add reminder
             </Typography>
-            <IconButton aria-label="Close" onClick={() => setAddOpen(false)}>
+            <IconButton aria-label="Close" color="error" onClick={() => setAddOpen(false)}>
               ✕
             </IconButton>
           </Stack>

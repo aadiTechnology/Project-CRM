@@ -37,22 +37,11 @@ import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
 import { PipelineStage, PipelineStageList, STAGE_COLOR_PRESETS } from '../types'
 
-function money(value: string | null) {
-  if (!value) return null
-  const n = Number(value)
-  if (Number.isNaN(n)) return null
-  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
-}
-
 function dayAge(createdAt: string) {
   const created = new Date(createdAt)
   if (Number.isNaN(created.getTime())) return null
   const days = Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000))
   return `Day ${Math.max(1, days + 1)}`
-}
-
-function expectedSum(leads: Lead[]) {
-  return leads.reduce((sum, lead) => sum + (Number(lead.expected_value) || 0), 0)
 }
 
 type StageForm = {
@@ -309,8 +298,8 @@ export function PipelinePage() {
   if (booting && projects.length === 0) return <LoadingScreen />
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0, height: '100%' }}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1.5}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, minHeight: 0, height: '100%' }}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
         <Box>
           <Typography variant="h1">Sales Pipeline</Typography>
         </Box>
@@ -328,7 +317,7 @@ export function PipelinePage() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap">
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} useFlexGap flexWrap="wrap">
         <TextField
           select
           size="small"
@@ -410,7 +399,6 @@ export function PipelinePage() {
         >
           {stages.map((stage) => {
             const column = byStage.get(stage.key) ?? []
-            const total = expectedSum(column)
             return (
               <Box
                 key={stage.id}
@@ -438,19 +426,14 @@ export function PipelinePage() {
                   maxHeight: '100%',
                 }}
               >
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, py: 1.25 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip
-                      size="small"
-                      label={stage.label}
-                      sx={{ bgcolor: `${stage.color}33`, color: '#0f172a', fontWeight: 700 }}
-                    />
-                    <Typography variant="body2" color="text.secondary">
-                      {column.length}
-                    </Typography>
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                    {total ? `₹${total.toLocaleString('en-IN')} expected` : '—'}
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, py: 1.25 }}>
+                  <Chip
+                    size="small"
+                    label={stage.label}
+                    sx={{ bgcolor: `${stage.color}33`, color: '#0f172a', fontWeight: 700 }}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {column.length}
                   </Typography>
                 </Stack>
                 <Stack spacing={1} sx={{ px: 1, pb: 1, overflowY: 'auto', flex: 1 }}>
@@ -512,11 +495,6 @@ export function PipelinePage() {
                           Follow-up: {formatDueLabel(lead.next_followup_at)}
                           {when === 'o' ? ' · overdue' : ''}
                         </Typography>
-                        {money(lead.expected_value) ? (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {money(lead.expected_value)} (est.)
-                          </Typography>
-                        ) : null}
                         <Stack direction="row" spacing={0.75} sx={{ mt: 1 }} useFlexGap flexWrap="wrap">
                           <Chip
                             size="small"
@@ -557,6 +535,7 @@ export function PipelinePage() {
           <IconButton
             type="button"
             aria-label="Close"
+            color="error"
             onClick={(event) => {
               event.preventDefault()
               closeManageDialog()

@@ -549,7 +549,14 @@ export function UsersPage() {
           <Box component="span" sx={{ flex: 1 }}>
             {t('access:confirmRole')}
           </Box>
-          <IconButton type="button" aria-label={t('common:close')} onClick={closeRoleDialog} edge="end" size="small">
+          <IconButton
+            type="button"
+            aria-label={t('common:close')}
+            color="error"
+            onClick={closeRoleDialog}
+            edge="end"
+            size="small"
+          >
             <CloseOutlinedIcon fontSize="small" />
           </IconButton>
         </DialogTitle>

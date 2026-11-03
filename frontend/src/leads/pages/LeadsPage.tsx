@@ -734,7 +734,18 @@ export function LeadsPage() {
                         onChange={(event) => setExtra(field.key, event.target.checked)}
                       />
                     }
-                    label={field.label + (field.is_required ? ' *' : '')}
+                    label={
+                      field.is_required ? (
+                        <>
+                          {field.label}{' '}
+                          <Box component="span" sx={{ color: 'error.main' }}>
+                            *
+                          </Box>
+                        </>
+                      ) : (
+                        field.label
+                      )
+                    }
                   />
                 )
               }
@@ -824,7 +835,7 @@ export function LeadsPage() {
   if (loading && items.length === 0 && projects.length === 0) return <LoadingScreen />
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={1.25}>
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <Typography variant="h1" sx={{ flex: 1, minWidth: 0 }}>
           Leads
@@ -1247,14 +1258,15 @@ export function LeadsPage() {
         onClose={closeImportDialog}
         fullScreen={phone}
         fullWidth
-        maxWidth="sm"
+        maxWidth="xs"
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1 }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pr: 1, py: 1.5 }}>
           <Box component="span" sx={{ flex: 1 }}>
             Import leads
           </Box>
           <IconButton
             aria-label="Close"
+            color="error"
             onClick={closeImportDialog}
             edge="end"
             size="small"
@@ -1263,11 +1275,10 @@ export function LeadsPage() {
             <CloseOutlinedIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 0.5 }}>
-            <Typography variant="body2" color="text.secondary">
-              Upload an Excel .xlsx file. Columns are matched by header name to this project&apos;s fields
-              (Manage fields on Leads). Repeated call-summary columns merge into Follow-up notes.
+        <DialogContent sx={{ pt: 0.5, pb: 1.5 }}>
+          <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              Upload .xlsx — headers match this project&apos;s fields.
             </Typography>
             <TextField
               select
@@ -1342,8 +1353,8 @@ export function LeadsPage() {
             ) : null}
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeImportDialog} disabled={importing}>
+        <DialogActions sx={{ px: 2, pb: 1.5 }}>
+          <Button color="error" onClick={closeImportDialog} disabled={importing}>
             Close
           </Button>
           <Button
@@ -1420,6 +1431,7 @@ export function LeadsPage() {
             <IconButton
               type="button"
               aria-label="Close"
+              color="error"
               onClick={(event) => {
                 event.preventDefault()
                 closeCreateDialog()
@@ -1485,7 +1497,7 @@ export function LeadsPage() {
             <Typography variant="h2" sx={{ flex: 1, fontSize: 20, fontWeight: 700 }}>
               Manage fields
             </Typography>
-            <IconButton aria-label="Close manage fields" onClick={closeFieldsDrawer} size="small">
+            <IconButton aria-label="Close manage fields" color="error" onClick={closeFieldsDrawer} size="small">
               <CloseOutlinedIcon fontSize="small" />
             </IconButton>
           </Stack>

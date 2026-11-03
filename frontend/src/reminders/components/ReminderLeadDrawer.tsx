@@ -306,32 +306,62 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
           sx: {
             width: { xs: '100%', sm: 520 },
             maxWidth: '100%',
+            height: { xs: 'auto', sm: '100%' },
             maxHeight: { xs: '92vh', sm: '100%' },
             borderTopLeftRadius: { xs: 16, sm: 0 },
             borderTopRightRadius: { xs: 16, sm: 0 },
-            p: 2.25,
+            p: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             boxShadow: '-12px 0 30px rgba(15,23,42,.12)',
           },
         }}
       >
         {lead && form ? (
-          <Stack spacing={2}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <Typography variant="h6" fontWeight={700}>
-                {lead.lead_number}
+          <>
+            <Box
+              sx={{
+                flexShrink: 0,
+                px: 2.25,
+                pt: 2.25,
+                pb: 1.5,
+                bgcolor: 'background.paper',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                zIndex: 1,
+              }}
+            >
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Typography variant="h6" fontWeight={700}>
+                  {lead.lead_number}
+                </Typography>
+                <Chip
+                  size="small"
+                  label={STATUS_LABEL[lead.status] ?? lead.status}
+                  sx={{ bgcolor: statusTone.bg, color: statusTone.color, fontWeight: 700 }}
+                />
+                <Box sx={{ flex: 1 }} />
+                <Button color="error" onClick={onClose}>
+                  Close
+                </Button>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {lead.project_name || 'Project'} · project cannot be changed
               </Typography>
-              <Chip
-                size="small"
-                label={STATUS_LABEL[lead.status] ?? lead.status}
-                sx={{ bgcolor: statusTone.bg, color: statusTone.color, fontWeight: 700 }}
-              />
-              <Box sx={{ flex: 1 }} />
-              <Button onClick={onClose}>Close</Button>
-            </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: -1 }}>
-              {lead.project_name || 'Project'} · project cannot be changed
-            </Typography>
+            </Box>
 
+            <Stack
+              spacing={2}
+              sx={{
+                flex: '1 1 auto',
+                minHeight: 0,
+                overflowY: 'auto',
+                px: 2.25,
+                pt: 2,
+                pb: 2.25,
+              }}
+            >
             {localError ? (
               <Typography color="error" variant="body2">
                 {localError}
@@ -685,6 +715,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, plan, onClose, onChanged }
               )}
             </Box>
           </Stack>
+          </>
         ) : null}
       </Drawer>
 
