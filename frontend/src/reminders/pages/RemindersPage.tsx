@@ -298,16 +298,19 @@ export function RemindersPage() {
   }
 
   async function markNoAnswer(lead: Lead) {
-    const note = 'No answer'
-    const requirement = lead.requirement ? `${lead.requirement}\n${note}` : note
-    await patchLead(
-      lead.id,
-      {
-        requirement,
-        next_followup_at: addDaysIso(lead.next_followup_at, 1),
-      },
-      `Marked no answer for ${lead.full_name}. Reminder moved to tomorrow.`,
-    )
+    setSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      await api.post(`/api/v1/leads/${lead.id}/calls`, { outcome: 'no_answer', summary: 'No answer' })
+      await api.patch(`/api/v1/leads/${lead.id}`, { next_followup_at: addDaysIso(lead.next_followup_at, 1) })
+      setNotice(`Marked no answer for ${lead.full_name}. Reminder moved to tomorrow.`)
+      await load()
+    } catch (requestError) {
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not update reminder.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveReschedule(event: FormEvent) {

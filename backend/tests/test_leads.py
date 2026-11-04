@@ -559,3 +559,58 @@ async def test_lead_validation_rejects_incomplete_or_unknown_values(client):
         assert db.scalar(select(Lead.id)) is None
     finally:
         db.close()
+
+
+async def test_each_call_keeps_its_own_summary(client):
+    company_id = _add_company("Calls Co")
+    team_id = _add_team(company_id, "Calls")
+    rep_id = _add_member("calls-rep@example.com", "SALESPERSON", company_id=company_id, team_id=team_id)
+    other_id = _add_member("calls-other@example.com", "SALESPERSON", company_id=company_id, team_id=team_id)
+    project_id = _add_project(company_id, name="Calls", code="CALLS", member_ids=[rep_id, other_id])
+
+    await _login(client, "calls-rep@example.com")
+    headers = await csrf_headers(client)
+    created = await client.post(
+        "/api/v1/leads",
+        json=_lead_payload(project_id=str(project_id), mobile="9811111111"),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["data"]["id"]
+
+    empty = await client.post(
+        f"/api/v1/leads/{lead_id}/calls",
+        json={"outcome": "connected", "summary": "   "},
+        headers=headers,
+    )
+    assert empty.status_code == 422
+    assert empty.json()["error"]["details"][0]["field"] == "summary"
+
+    first = await client.post(
+        f"/api/v1/leads/{lead_id}/calls",
+        json={"outcome": "connected", "summary": "Asked for a brochure"},
+        headers=headers,
+    )
+    assert first.status_code == 201, first.text
+    assert first.json()["data"]["summary"] == "Asked for a brochure"
+
+    second = await client.post(
+        f"/api/v1/leads/{lead_id}/calls",
+        json={"outcome": "no_answer", "summary": "Rang twice"},
+        headers=headers,
+    )
+    assert second.status_code == 201, second.text
+
+    listed = await client.get(f"/api/v1/leads/{lead_id}/calls")
+    assert listed.status_code == 200
+    items = listed.json()["data"]["items"]
+    assert [item["summary"] for item in items] == ["Rang twice", "Asked for a brochure"]
+    assert items[0]["outcome"] == "no_answer"
+    assert items[1]["outcome"] == "connected"
+
+    lead = await client.get(f"/api/v1/leads/{lead_id}")
+    assert lead.json()["data"]["call_summary"] == "Rang twice"
+
+    await _login(client, "calls-other@example.com")
+    hidden = await client.get(f"/api/v1/leads/{lead_id}/calls")
+    assert hidden.status_code == 404

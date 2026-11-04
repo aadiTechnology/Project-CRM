@@ -18,11 +18,14 @@ from app.audit.service import record_audit
 from app.common.exceptions import AppError, ErrorCode
 from app.core.logging import log_event
 from app.lead_fields.service import normalize_extra_values
-from app.leads.models import Lead
+from app.leads.models import Lead, LeadCall
 from app.leads.schemas import (
+    CreateLeadCallRequest,
     CreateLeadRequest,
     LeadActivityItem,
     LeadActivityList,
+    LeadCallList,
+    LeadCallPublic,
     UpdateLeadRequest,
     normalize_priority,
     normalize_status,
@@ -613,6 +616,13 @@ def _format_activity_message(action: str, context: dict[str, Any] | None) -> str
     ctx = context or {}
     changes = ctx.get("changes") if isinstance(ctx.get("changes"), dict) else {}
 
+    if action == "lead_call_logged":
+        outcome = "Connected" if ctx.get("outcome") == "connected" else "No answer"
+        summary = ctx.get("summary")
+        if isinstance(summary, str) and summary.strip():
+            return f"{outcome}: {summary.strip()}"
+        return outcome
+
     if action == "lead_created":
         return "Lead created and assigned"
 
@@ -692,3 +702,72 @@ def list_lead_activity(
         for row in rows
     ]
     return LeadActivityList(items=items)
+
+
+def list_lead_calls(db: Session, *, actor: User, lead_id: uuid.UUID) -> LeadCallList:
+    _visible(db, actor, lead_id)
+    rows = db.execute(
+        select(LeadCall, User.full_name)
+        .outerjoin(User, User.id == LeadCall.user_id)
+        .where(LeadCall.lead_id == lead_id)
+        .order_by(LeadCall.created_at.desc())
+    ).all()
+    return LeadCallList(
+        items=[
+            LeadCallPublic(
+                id=str(call.id),
+                lead_id=str(call.lead_id),
+                user_id=None if call.user_id is None else str(call.user_id),
+                user_name=user_name or "Someone",
+                outcome=call.outcome,
+                summary=call.summary,
+                created_at=call.created_at,
+            )
+            for call, user_name in rows
+        ]
+    )
+
+
+def create_lead_call(
+    db: Session,
+    *,
+    actor: User,
+    lead_id: uuid.UUID,
+    payload: CreateLeadCallRequest,
+    ip_address: str | None,
+) -> LeadCallPublic:
+    lead = _visible(db, actor, lead_id)
+    if payload.outcome == "connected" and not payload.summary:
+        raise _validation("summary", "REQUIRED", "Write what was said on this call.")
+    now = datetime.now(UTC)
+    call = LeadCall(
+        lead_id=lead.id,
+        user_id=actor.id,
+        outcome=payload.outcome,
+        summary=payload.summary,
+        created_at=now,
+    )
+    db.add(call)
+    if payload.summary:
+        lead.call_summary = payload.summary
+        lead.updated_at = now
+    record_audit(
+        db,
+        action="lead_call_logged",
+        actor_id=actor.id,
+        target_type="lead",
+        target_id=lead.id,
+        context={"outcome": payload.outcome, "summary": payload.summary},
+        ip_address=ip_address,
+    )
+    db.commit()
+    db.refresh(call)
+    return LeadCallPublic(
+        id=str(call.id),
+        lead_id=str(call.lead_id),
+        user_id=str(actor.id),
+        user_name=actor.full_name,
+        outcome=call.outcome,
+        summary=call.summary,
+        created_at=call.created_at,
+    )

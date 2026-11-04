@@ -75,7 +75,7 @@ function formFromLead(lead: Lead): DrawerForm {
     email: lead.email ?? '',
     city: lead.city ?? '',
     requirement: lead.requirement ?? '',
-    call_summary: resolveCallSummary(lead.call_summary, lead.extra_values),
+    call_summary: '',
     lead_source: lead.lead_source ?? '',
     priority: lead.priority,
     status: lead.status,
@@ -91,6 +91,14 @@ type LeadActivityItem = {
   message: string
 }
 
+type LeadCallItem = {
+  id: string
+  user_name: string
+  outcome: string
+  summary: string | null
+  created_at: string
+}
+
 type Props = {
   lead: Lead | null
   canUpdate: boolean
@@ -99,6 +107,10 @@ type Props = {
   onClose: () => void
   onChanged: (message: string) => Promise<void>
   onEditPlan?: () => void
+}
+
+function earlierNote(lead: Lead): string {
+  return resolveCallSummary(lead.call_summary, lead.extra_values)
 }
 
 function formatActivityAt(value: string) {
@@ -115,6 +127,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
   const [form, setForm] = useState<DrawerForm | null>(null)
   const [fields, setFields] = useState<LeadField[]>([])
   const [activity, setActivity] = useState<LeadActivityItem[]>([])
+  const [calls, setCalls] = useState<LeadCallItem[]>([])
   const [saving, setSaving] = useState(false)
   const [localError, setLocalError] = useState('')
   const [action, setAction] = useState<ActionKind>(null)
@@ -132,11 +145,21 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
     }
   }, [])
 
+  const loadCalls = useCallback(async (leadId: string) => {
+    try {
+      const result = await api.get<{ items: LeadCallItem[] }>(`/api/v1/leads/${leadId}/calls`)
+      setCalls(result.data.items)
+    } catch {
+      setCalls([])
+    }
+  }, [])
+
   useEffect(() => {
     if (!lead) {
       setForm(null)
       setFields([])
       setActivity([])
+      setCalls([])
       setLocalError('')
       setAction(null)
       return
@@ -146,6 +169,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
     setAction(null)
     setCustomDueDate(isoToDateInput(lead.next_followup_at) || isoToDateInput(addDaysIso(null, 1)))
     void loadActivity(lead.id)
+    void loadCalls(lead.id)
     void (async () => {
       if (!lead.project_id) {
         setFields([])
@@ -158,7 +182,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
         setFields([])
       }
     })()
-  }, [lead, loadActivity])
+  }, [lead, loadActivity, loadCalls])
 
   const statusTone = lead ? STATUS_TONE[lead.status] ?? STATUS_TONE.new : STATUS_TONE.new
 
@@ -173,6 +197,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
       await api.patch(`/api/v1/leads/${lead.id}`, body)
       await onChanged(message)
       await loadActivity(lead.id)
+      await loadCalls(lead.id)
       if (closeDrawer) onClose()
       else setAction(null)
       } catch (requestError) {
@@ -181,7 +206,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
         setSaving(false)
       }
     },
-    [lead, loadActivity, onChanged, onClose],
+    [lead, loadActivity, loadCalls, onChanged, onClose],
   )
 
   async function saveField(body: Record<string, unknown>) {
@@ -212,14 +237,50 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
     if (!lead || !action) return
 
     if (action === 'noanswer') {
-      const note = actionNote.trim() || 'No answer'
-      await patch(
-        {
-          requirement: lead.requirement ? `${lead.requirement}\n${note}` : note,
+      const note = actionNote.trim()
+      setSaving(true)
+      setLocalError('')
+      try {
+        await api.post(`/api/v1/leads/${lead.id}/calls`, {
+          outcome: 'no_answer',
+          summary: note || null,
+        })
+        await api.patch(`/api/v1/leads/${lead.id}`, {
           next_followup_at: addDaysIso(lead.next_followup_at, 1),
-        },
-        `No answer · ${lead.full_name}`,
-      )
+        })
+        setAction(null)
+        setActionNote('')
+        if (form) setForm({ ...form, call_summary: '' })
+        await loadCalls(lead.id)
+        await loadActivity(lead.id)
+        await onChanged(`No answer · ${lead.full_name}`)
+      } catch (requestError) {
+        setLocalError(requestError instanceof ApiError ? requestError.message : 'Could not save this call.')
+      } finally {
+        setSaving(false)
+      }
+    }
+  }
+
+  async function saveThisCall() {
+    if (!lead || !form) return
+    const summary = form.call_summary.trim()
+    if (!summary) {
+      setLocalError('Write what was said on this call.')
+      return
+    }
+    setSaving(true)
+    setLocalError('')
+    try {
+      await api.post(`/api/v1/leads/${lead.id}/calls`, { outcome: 'connected', summary })
+      setForm({ ...form, call_summary: '' })
+      await loadCalls(lead.id)
+      await loadActivity(lead.id)
+      await onChanged(`Connected · ${lead.full_name}`)
+    } catch (requestError) {
+      setLocalError(requestError instanceof ApiError ? requestError.message : 'Could not save this call.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -369,21 +430,64 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                   }
                 }}
               />
-              <TextField
-                label="Call Summary"
-                value={form.call_summary}
-                disabled={!canUpdate || saving}
-                multiline
-                minRows={3}
-                onChange={(event) => setForm({ ...form, call_summary: event.target.value })}
-                onBlur={() => {
-                  const next = form.call_summary.trim()
-                  const previous = resolveCallSummary(lead.call_summary, lead.extra_values)
-                  if (next !== previous) {
-                    void saveField({ call_summary: next || null })
-                  }
-                }}
-              />
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <TextField
+                  label="This call"
+                  value={form.call_summary}
+                  disabled={!canUpdate || saving}
+                  multiline
+                  minRows={3}
+                  fullWidth
+                  placeholder="What was said on this call"
+                  helperText="Each save keeps a separate summary. This box starts empty for the next call."
+                  onChange={(event) => setForm({ ...form, call_summary: event.target.value })}
+                />
+                {canUpdate ? (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={saving || !form.call_summary.trim()}
+                    onClick={() => void saveThisCall()}
+                    sx={{ mt: 1 }}
+                  >
+                    Save this call
+                  </Button>
+                ) : null}
+                <Typography fontWeight={700} sx={{ mt: 1.5, mb: 0.5 }}>
+                  Call history
+                </Typography>
+                {calls.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {earlierNote(lead)
+                      ? `Earlier note, before call history: ${earlierNote(lead)}`
+                      : 'No calls logged yet.'}
+                  </Typography>
+                ) : (
+                  <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                    {calls.map((call) => (
+                      <Box
+                        component="li"
+                        key={call.id}
+                        sx={{
+                          py: 0.75,
+                          borderBottom: '1px solid',
+                          borderColor: 'divider',
+                          '&:last-child': { borderBottom: 0 },
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight={700}>
+                          {call.outcome === 'connected' ? 'Connected' : 'No answer'}
+                          <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                            {' '}
+                            · {call.user_name} · {formatActivityAt(call.created_at)}
+                          </Box>
+                        </Typography>
+                        {call.summary ? <Typography variant="body2">{call.summary}</Typography> : null}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
               <TextField
                 select
                 label="Lead Source"

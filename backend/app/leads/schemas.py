@@ -247,6 +247,38 @@ class LeadActivityList(BaseModel):
     items: list[LeadActivityItem]
 
 
+LeadCallOutcome = Literal["connected", "no_answer"]
+
+
+class CreateLeadCallRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: LeadCallOutcome
+    summary: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("summary")
+    @classmethod
+    def clean_summary(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class LeadCallPublic(BaseModel):
+    id: str
+    lead_id: str
+    user_id: str | None
+    user_name: str
+    outcome: str
+    summary: str | None
+    created_at: datetime
+
+
+class LeadCallList(BaseModel):
+    items: list[LeadCallPublic]
+
+
 def to_lead_public(lead: Lead, project_name: str | None = None) -> LeadPublic:
     expected = None if lead.expected_value is None else f"{lead.expected_value:.2f}"
     extras = lead.extra_values if isinstance(lead.extra_values, dict) else {}

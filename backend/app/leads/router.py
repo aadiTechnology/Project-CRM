@@ -13,7 +13,10 @@ from app.leads.import_service import import_leads_from_excel
 from app.leads.schemas import (
     CreateLeadRequest,
     ImportLeadsResult,
+    CreateLeadCallRequest,
     LeadActivityList,
+    LeadCallList,
+    LeadCallPublic,
     LeadListData,
     LeadPlanStep,
     LeadPriority,
@@ -26,7 +29,9 @@ from app.leads.service import (
     create_lead,
     delete_lead,
     get_lead,
+    create_lead_call,
     list_lead_activity,
+    list_lead_calls,
     list_leads,
     project_names_for_leads,
     update_lead,
@@ -165,6 +170,50 @@ def get_lead_activity(
         data=list_lead_activity(db, actor=actor, lead_id=lead_id, limit=limit),
         message="Success",
     )
+
+
+@router.get(
+    "/{lead_id}/calls",
+    response_model=ApiResponse[LeadCallList],
+    summary="List calls for a lead",
+    description="Returns every logged call for one lead, newest first. Each row keeps its own summary.",
+    responses=error_responses(401, 403, 404),
+)
+def get_lead_calls(
+    lead_id: uuid.UUID,
+    actor: User = Depends(require_permission("leads.read")),
+    db: Session = Depends(get_db),
+) -> ApiResponse[LeadCallList]:
+    return ApiResponse(data=list_lead_calls(db, actor=actor, lead_id=lead_id), message="Success")
+
+
+@router.post(
+    "/{lead_id}/calls",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[LeadCallPublic],
+    summary="Log a call",
+    description=(
+        "Stores one call on the lead. Connected requires a summary. "
+        "A summary also becomes the lead's latest call summary. Older calls stay on this list."
+    ),
+    responses=error_responses(401, 403, 404, 422),
+)
+def post_lead_call(
+    lead_id: uuid.UUID,
+    payload: CreateLeadCallRequest,
+    request: Request,
+    actor: User = Depends(require_permission("leads.update")),
+    db: Session = Depends(get_db),
+) -> ApiResponse[LeadCallPublic]:
+    created = create_lead_call(
+        db,
+        actor=actor,
+        lead_id=lead_id,
+        payload=payload,
+        ip_address=client_ip(request),
+    )
+    label = "Connected" if created.outcome == "connected" else "No answer"
+    return ApiResponse(data=created, message=f"{label} saved.")
 
 
 @router.get(
