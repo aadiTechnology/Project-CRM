@@ -267,10 +267,12 @@ async def test_user_management_permissions_and_soft_delete(client):
     user_id = created.json()["data"]["id"]
     deleted = await client.delete(f"/api/v1/users/{user_id}", headers=await csrf_headers(client))
     assert deleted.status_code == 200
-    assert deleted.json()["data"]["is_active"] is False
+    assert deleted.json()["data"]["email"] == "temp@example.com"
     assert "password_hash" not in deleted.text
+    listed = await client.get("/api/v1/users?limit=100")
+    assert all(item["id"] != user_id for item in listed.json()["data"]["items"])
 
-    assert (await login(client, email="temp@example.com")).status_code == 403
+    assert (await login(client, email="temp@example.com")).status_code == 401
 
 
 def test_access_scope_follows_role_and_team():

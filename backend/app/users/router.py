@@ -24,7 +24,7 @@ from app.users.service import (
     change_user_role,
     company_names_for_users,
     create_managed_user,
-    deactivate_managed_user,
+    delete_managed_user,
     is_platform_admin,
     list_active_companies,
     list_users,
@@ -202,8 +202,8 @@ def update_user(
     response_model=ApiResponse[AccessUser],
     summary="Delete a user",
     description=(
-        "Soft-deletes an account by marking it inactive and revoking its sessions. "
-        "Requires users.delete. The account row is kept for audit."
+        "Deletes an account and removes it from the user list. "
+        "Leads they own are handed to the person who deletes them. Requires users.delete."
     ),
     responses=error_responses(401, 403, 404, 409),
 )
@@ -213,10 +213,13 @@ def delete_user(
     actor: User = Depends(require_permission("users.delete")),
     db: Session = Depends(get_db),
 ) -> ApiResponse[AccessUser]:
-    updated = deactivate_managed_user(
+    existing = db.get(User, user_id)
+    snapshot = _access_user(db, existing) if existing is not None else None
+    delete_managed_user(
         db,
         actor=actor,
         target_id=user_id,
         ip_address=client_ip(request),
     )
-    return ApiResponse(data=_access_user(db, updated), message="User deleted.")
+    assert snapshot is not None
+    return ApiResponse(data=snapshot.model_copy(update={"is_active": False}), message="User deleted.")

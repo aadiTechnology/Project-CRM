@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 
 from email_validator import EmailNotValidError, validate_email
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -518,3 +518,62 @@ def deactivate_managed_user(
         is_active=False,
         ip_address=ip_address,
     )
+
+
+def delete_managed_user(
+    db: Session,
+    *,
+    actor: User,
+    target_id: uuid.UUID,
+    ip_address: str | None,
+) -> User:
+    """Remove the account so it disappears from the user list.
+
+    Leads they own or created are handed to the person who deletes them.
+    The account row is not kept.
+    """
+
+    from app.leads.models import Lead
+
+    target = _managed_user(db, actor, target_id)
+    _reject_self(actor, target)
+    if _is_active_admin(target) and _active_admin_count(db) <= 1:
+        raise AppError(
+            ErrorCode.LAST_ADMIN,
+            "The last active administrator cannot be changed.",
+            409,
+        )
+    now = datetime.now(UTC)
+    db.execute(
+        update(Lead)
+        .where(Lead.owner_id == target.id)
+        .values(owner_id=actor.id, updated_at=now)
+    )
+    db.execute(
+        update(Lead)
+        .where(Lead.created_by_id == target.id)
+        .values(created_by_id=actor.id, updated_at=now)
+    )
+    db.execute(update(User).where(User.manager_id == target.id).values(manager_id=None))
+    revoke_all_refresh_tokens(db, target.id, now)
+    record_audit(
+        db,
+        action="user_deleted",
+        actor_id=actor.id,
+        target_type="user",
+        target_id=target.id,
+        context={"email": target.email, "full_name": target.full_name},
+        ip_address=ip_address,
+    )
+    db.delete(target)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AppError(
+            ErrorCode.CONFLICT,
+            "This user could not be deleted because other records still use the account.",
+            409,
+        ) from exc
+    log_event(logger, "user_deleted", actor_id=str(actor.id), target_id=str(target_id))
+    return target
