@@ -92,6 +92,7 @@ def get_leads(
     project_id: uuid.UUID | None = Query(default=None),
     plan_step: LeadPlanStep | None = Query(default=None),
     exclude_lost: bool = Query(default=False),
+    has_followup: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ) -> ApiResponse[LeadListData]:
@@ -108,6 +109,7 @@ def get_leads(
             project_id=project_id,
             plan_step=plan_step,
             exclude_lost=exclude_lost,
+            has_followup=has_followup,
         ),
         limit=limit,
         offset=offset,

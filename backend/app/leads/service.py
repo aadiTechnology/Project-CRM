@@ -70,6 +70,7 @@ class LeadFilters:
     project_id: uuid.UUID | None = None
     plan_step: str | None = None
     exclude_lost: bool = False
+    has_followup: bool = False
 
 
 def _validation(field: str, code: str, message: str) -> AppError:
@@ -260,6 +261,8 @@ def list_leads(
         )
         conditions.append(~closed_on_project)
         conditions.append(Lead.status.notin_(("lost", "Lost", "unqualified", "won", "Won")))
+    if filters.has_followup:
+        conditions.append(Lead.next_followup_at.is_not(None))
     # Salespeople only work leads on projects they are assigned to (plus their own unscoped legacy rows).
     if RoleName.SALESPERSON in {link.role.name for link in actor.user_roles} and RoleName.BUSINESS_OWNER not in {
         link.role.name for link in actor.user_roles

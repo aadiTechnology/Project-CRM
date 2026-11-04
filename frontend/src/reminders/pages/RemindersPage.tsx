@@ -60,6 +60,7 @@ import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
 import { ReminderLeadDrawer } from '../components/ReminderLeadDrawer'
+import { setReminderBadge } from '../reminder-badge'
 
 type WhenFilter = 'ALL' | 'o' | 't' | 'u'
 type SortBy = 'time' | 'pri' | 'name'
@@ -252,6 +253,13 @@ export function RemindersPage() {
     setPage(1)
     setSelected([])
   }, [when, priority, search, sort, projectId])
+
+  useEffect(() => {
+    if (loading) return
+    setReminderBadge(filtered.length)
+  }, [filtered.length, loading])
+
+  useEffect(() => () => setReminderBadge(null), [])
 
   function toggleSelect(id: string) {
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))

@@ -18,6 +18,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom'
 
 import { roleLabel } from '../../access/role-label'
 import type { LeadList } from '../../leads/types'
+import { subscribeReminderBadge } from '../../reminders/reminder-badge'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
 import { SECTIONS, homePathForRoles, isNavActive, primaryRole, visibleNav, type NavItem } from './nav'
@@ -163,7 +164,10 @@ export function SidebarNav({
   const leadRole = primaryRole(roles)
   const homePath = homePathForRoles(roles)
   const [reminderCount, setReminderCount] = useState(0)
+  const [reminderOverride, setReminderOverride] = useState<number | null>(null)
   const showReminders = items.some((item) => item.id === 'reminders')
+
+  useEffect(() => subscribeReminderBadge(setReminderOverride), [])
 
   useEffect(() => {
     if (!showReminders) {
@@ -173,9 +177,12 @@ export function SidebarNav({
     let cancelled = false
     void (async () => {
       try {
-        const result = await api.get<LeadList>('/api/v1/leads?limit=500')
+        // Same rule as the Reminders page: a due date, and not Won or Lost.
+        const result = await api.get<LeadList>(
+          '/api/v1/leads?limit=1&exclude_lost=true&has_followup=true',
+        )
         if (cancelled) return
-        setReminderCount(result.data.items.filter((lead) => Boolean(lead.next_followup_at)).length)
+        setReminderCount(result.data.total)
       } catch {
         if (!cancelled) setReminderCount(0)
       }
@@ -267,7 +274,7 @@ export function SidebarNav({
                     label={t(`navigation:items.${item.id}`)}
                     collapsed={collapsed}
                     active={isNavActive(pathname, item)}
-                    badge={item.id === 'reminders' ? reminderCount : undefined}
+                    badge={item.id === 'reminders' ? (reminderOverride ?? reminderCount) : undefined}
                     onNavigate={onNavigate}
                   />
                 ))}

@@ -159,7 +159,8 @@ async def test_won_and_lost_leave_reminders_and_keep_call_history(client):
     assert won.status_code == 200, won.text
     assert won.json()["data"]["status"] == "won"
     assert won.json()["data"]["next_followup_at"] is None
-    hidden = await client.get("/api/v1/leads?exclude_lost=true&limit=50")
+    hidden = await client.get("/api/v1/leads?exclude_lost=true&has_followup=true&limit=50")
+    assert hidden.json()["data"]["total"] == 0
     assert lead_id not in [item["id"] for item in hidden.json()["data"]["items"]]
     history = await client.get(f"/api/v1/leads/{lead_id}/calls")
     assert [item["summary"] for item in history.json()["data"]["items"]] == ["Call 1: interested"]
@@ -170,7 +171,8 @@ async def test_won_and_lost_leave_reminders_and_keep_call_history(client):
         headers=headers,
     )
     assert reopened.status_code == 200, reopened.text
-    back = await client.get("/api/v1/leads?exclude_lost=true&limit=50")
+    back = await client.get("/api/v1/leads?exclude_lost=true&has_followup=true&limit=50")
+    assert back.json()["data"]["total"] == 1
     assert lead_id in _due_ids(back.json())
 
     lost = await client.patch(
