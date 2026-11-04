@@ -29,6 +29,7 @@ import {
 import {
   addDaysIso,
   dateInputToIsoNoon,
+  formatEnquiryDate,
   isoToDateInput,
 } from '../../leads/lead-dates'
 import {
@@ -119,6 +120,29 @@ function historyLines(note: string): { title: string; message: string }[] {
     })
 }
 
+function formatHistoryDate(value: string | null | undefined): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed) || /^\d{4}-\d{2}-\d{2}T00:00:00/.test(trimmed)) {
+    const formatted = formatEnquiryDate(trimmed)
+    return formatted === '—' ? '' : formatted
+  }
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) {
+    const formatted = formatEnquiryDate(trimmed)
+    return formatted === '—' ? '' : formatted
+  }
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function importedHistoryDate(title: string, lead: Lead): string {
+  const laterFollowup = /\bfollow/i.test(title) && /\b(2nd|2|second|3rd|third)\b/i.test(title)
+  const raw = laterFollowup
+    ? lead.next_followup_at || lead.enquiry_date || lead.created_at
+    : lead.enquiry_date || lead.created_at
+  return formatHistoryDate(raw)
+}
+
 const historyRowSx = {
   py: 1,
   borderBottom: '1px solid',
@@ -127,9 +151,7 @@ const historyRowSx = {
 } as const
 
 function formatActivityAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('en-CA')
+  return formatHistoryDate(value) || value
 }
 
 export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, onClose, onChanged }: Props) {
@@ -721,7 +743,7 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                             {line.title}
                             <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                               {' '}
-                              · Imported note
+                              · {importedHistoryDate(line.title, lead) || 'Imported note'}
                             </Box>
                           </Typography>
                           <Typography variant="body2">{line.message}</Typography>
