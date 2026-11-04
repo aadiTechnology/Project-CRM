@@ -79,7 +79,7 @@ function formFromLead(lead: Lead): DrawerForm {
     lead_source: lead.lead_source ?? '',
     priority: lead.priority,
     status: lead.status,
-    enquiry_date: isoToDateInput(lead.created_at),
+    enquiry_date: (lead.enquiry_date ?? '').slice(0, 10),
     extra_values: extras,
   }
 }
@@ -500,6 +500,9 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                 }}
               >
                 <MenuItem value="">—</MenuItem>
+                {form.lead_source && !(LEAD_SOURCES as readonly string[]).includes(form.lead_source) ? (
+                  <MenuItem value={form.lead_source}>{form.lead_source}</MenuItem>
+                ) : null}
                 {LEAD_SOURCES.map((source) => (
                   <MenuItem key={source} value={source}>
                     {source}

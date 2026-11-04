@@ -52,9 +52,11 @@ export interface LeadProjectOption {
 export const LEAD_SOURCES = [
   'Website',
   'WhatsApp',
+  'WhatsApp Ads',
   'Instagram',
   'Facebook',
   'Referral',
+  'Reference',
   'Walk-in',
   'Phone call',
   'Google',
