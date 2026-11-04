@@ -624,3 +624,39 @@ async def test_each_call_keeps_its_own_summary(client):
     await _login(client, "calls-other@example.com")
     hidden = await client.get(f"/api/v1/leads/{lead_id}/calls")
     assert hidden.status_code == 404
+
+
+async def test_new_call_keeps_imported_summary_in_history(client):
+    company_id = _add_company("Import History Co")
+    team_id = _add_team(company_id, "Import History")
+    rep_id = _add_member("import-history@example.com", "SALESPERSON", company_id=company_id, team_id=team_id)
+    project_id = _add_project(company_id, name="Import", code="IMPHIST", member_ids=[rep_id])
+    imported = "1st follow-up: required info sent\n2nd follow-up: msg sent no respond"
+
+    await _login(client, "import-history@example.com")
+    headers = await csrf_headers(client)
+    created = await client.post(
+        "/api/v1/leads",
+        json=_lead_payload(
+            project_id=str(project_id),
+            mobile="9822222222",
+            call_summary=imported,
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["data"]["id"]
+
+    saved = await client.post(
+        f"/api/v1/leads/{lead_id}/calls",
+        json={"outcome": "connected", "summary": "next followup"},
+        headers=headers,
+    )
+    assert saved.status_code == 201, saved.text
+
+    history = await client.get(f"/api/v1/leads/{lead_id}/calls")
+    assert history.status_code == 200
+    summaries = [item["summary"] for item in history.json()["data"]["items"]]
+    assert summaries[0] == "next followup"
+    assert imported in summaries
+    assert (await client.get(f"/api/v1/leads/{lead_id}")).json()["data"]["call_summary"] == "next followup"

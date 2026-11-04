@@ -107,6 +107,39 @@ function earlierNote(lead: Lead): string {
   return resolveCallSummary(lead.call_summary, lead.extra_values)
 }
 
+const NOTE_LABELS = new Set([
+  'call summary',
+  'follow-up notes',
+  'follow up notes',
+  'remarks',
+  'discussion summary',
+])
+
+function extraHistoryNotes(lead: Lead, fields: LeadField[]): string[] {
+  const notes: string[] = []
+  const seen = new Set<string>()
+  const add = (value: string) => {
+    const text = value.trim()
+    if (!text || seen.has(text)) return
+    seen.add(text)
+    notes.push(text)
+  }
+  add(earlierNote(lead))
+  for (const field of fields) {
+    const label = field.label.trim().toLowerCase()
+    if (!NOTE_LABELS.has(label) && field.key !== 'follow_up_notes' && field.key !== 'remarks') continue
+    const raw = lead.extra_values?.[field.key]
+    if (typeof raw === 'string' || typeof raw === 'number') add(String(raw))
+  }
+  return notes
+}
+
+function structuredHistory(summary: string) {
+  const lines = historyLines(summary)
+  if (lines.length < 2 || lines.every((line) => line.title === 'Imported note')) return null
+  return lines
+}
+
 function historyLines(note: string): { title: string; message: string }[] {
   return note
     .split(/\r?\n/)
@@ -714,31 +747,54 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
               <Typography fontWeight={700} sx={{ mb: 1 }}>
                 Call history
               </Typography>
-              {calls.length === 0 && !earlierNote(lead) ? (
-                <Typography variant="body2" color="text.secondary">
-                  No calls logged yet.
-                </Typography>
-              ) : (
-                <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
-                  {calls.map((call) => (
-                    <Box component="li" key={call.id} sx={historyRowSx}>
-                      <Typography variant="body2" fontWeight={700}>
-                        {call.outcome === 'connected' ? 'Connected' : 'No answer'}
-                        <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-                          {' '}
-                          · {call.user_name} · {formatActivityAt(call.created_at)}
+              {(() => {
+                const logged = new Set(calls.map((call) => (call.summary || '').trim()).filter(Boolean))
+                const pendingNotes = extraHistoryNotes(lead, fields).filter((note) => !logged.has(note))
+                if (calls.length === 0 && pendingNotes.length === 0) {
+                  return (
+                    <Typography variant="body2" color="text.secondary">
+                      No calls logged yet.
+                    </Typography>
+                  )
+                }
+                return (
+                  <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                    {calls.map((call) => {
+                      const lines = structuredHistory(call.summary || '')
+                      if (lines) {
+                        return lines.map((line, index) => (
+                          <Box component="li" key={`${call.id}-${index}`} sx={historyRowSx}>
+                            <Typography variant="body2" fontWeight={700}>
+                              {line.title}
+                              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                                {' '}
+                                · {importedHistoryDate(line.title, lead) || formatActivityAt(call.created_at)}
+                              </Box>
+                            </Typography>
+                            <Typography variant="body2">{line.message}</Typography>
+                          </Box>
+                        ))
+                      }
+                      return (
+                        <Box component="li" key={call.id} sx={historyRowSx}>
+                          <Typography variant="body2" fontWeight={700}>
+                            {call.outcome === 'connected' ? 'Connected' : 'No answer'}
+                            <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                              {' '}
+                              · {call.user_name} · {formatActivityAt(call.created_at)}
+                            </Box>
+                          </Typography>
+                          {call.summary ? (
+                            <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+                              {call.summary}
+                            </Typography>
+                          ) : null}
                         </Box>
-                      </Typography>
-                      {call.summary ? (
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
-                          {call.summary}
-                        </Typography>
-                      ) : null}
-                    </Box>
-                  ))}
-                  {calls.length === 0
-                    ? historyLines(earlierNote(lead)).map((line, index) => (
-                        <Box component="li" key={`${line.title}-${index}`} sx={historyRowSx}>
+                      )
+                    })}
+                    {pendingNotes.flatMap((note) =>
+                      historyLines(note).map((line, index) => (
+                        <Box component="li" key={`imported-${index}-${line.title}`} sx={historyRowSx}>
                           <Typography variant="body2" fontWeight={700}>
                             {line.title}
                             <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500 }}>
@@ -748,10 +804,11 @@ export function ReminderLeadDrawer({ lead, canUpdate, canDelete = false, plan, o
                           </Typography>
                           <Typography variant="body2">{line.message}</Typography>
                         </Box>
-                      ))
-                    : null}
-                </Box>
-              )}
+                      )),
+                    )}
+                  </Box>
+                )
+              })()}
             </Box>
           </Stack>
           </>

@@ -17,7 +17,7 @@ from app.audit.models import AuditLog
 from app.audit.service import record_audit
 from app.common.exceptions import AppError, ErrorCode
 from app.core.logging import log_event
-from app.lead_fields.service import normalize_extra_values
+from app.lead_fields.service import active_fields_for_project, normalize_extra_values
 from app.leads.models import Lead, LeadCall
 from app.leads.schemas import (
     CreateLeadCallRequest,
@@ -56,6 +56,16 @@ from app.users.service import is_platform_admin
 
 logger = logging.getLogger("app.leads")
 _MOBILE = re.compile(r"^\+?[0-9][0-9\s\-()]{7,18}$")
+_NOTE_LABELS = frozenset(
+    {
+        "call summary",
+        "follow-up notes",
+        "follow up notes",
+        "remarks",
+        "discussion summary",
+    }
+)
+_NOTE_KEYS = frozenset({"call_summary", "follow_up_notes", "followup_notes", "remarks"})
 ASSIGN_PERMISSION = "leads.assign"
 
 
@@ -385,6 +395,17 @@ def create_lead(
         },
         ip_address=ip_address,
     )
+    imported = (payload.call_summary or "").strip()
+    if imported:
+        db.add(
+            LeadCall(
+                lead_id=lead.id,
+                user_id=actor.id,
+                outcome="connected",
+                summary=imported,
+                created_at=now,
+            )
+        )
     db.commit()
     db.refresh(lead)
     log_event(logger, "lead_created", actor_id=str(actor.id), lead_id=str(lead.id))
@@ -731,6 +752,62 @@ def list_lead_calls(db: Session, *, actor: User, lead_id: uuid.UUID) -> LeadCall
     )
 
 
+def _note_texts(db: Session, lead: Lead) -> list[str]:
+    """Imported call notes live on the lead and sometimes on a custom notes field."""
+
+    texts: list[str] = []
+    summary = (lead.call_summary or "").strip()
+    if summary:
+        texts.append(summary)
+    extras = lead.extra_values if isinstance(lead.extra_values, dict) else {}
+    if lead.project_id is None or not extras:
+        return texts
+    for field in active_fields_for_project(db, lead.project_id):
+        label = field.label.strip().lower()
+        if label not in _NOTE_LABELS and field.key not in _NOTE_KEYS:
+            continue
+        raw = extras.get(field.key)
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if text and text not in texts:
+            texts.append(text)
+    return texts
+
+
+def _archive_previous_notes(db: Session, lead: Lead, *, skip: str | None) -> None:
+    """Keep imported notes when a new call replaces the latest summary."""
+
+    existing = {
+        (row or "").strip()
+        for row in db.scalars(select(LeadCall.summary).where(LeadCall.lead_id == lead.id)).all()
+    }
+    skip_text = (skip or "").strip()
+    stamp = lead.created_at
+    if lead.enquiry_date is not None:
+        stamp = datetime(
+            lead.enquiry_date.year,
+            lead.enquiry_date.month,
+            lead.enquiry_date.day,
+            12,
+            0,
+            tzinfo=UTC,
+        )
+    for text in _note_texts(db, lead):
+        if text == skip_text or text in existing:
+            continue
+        db.add(
+            LeadCall(
+                lead_id=lead.id,
+                user_id=lead.owner_id,
+                outcome="connected",
+                summary=text,
+                created_at=stamp,
+            )
+        )
+        existing.add(text)
+
+
 def create_lead_call(
     db: Session,
     *,
@@ -743,6 +820,7 @@ def create_lead_call(
     if payload.outcome == "connected" and not payload.summary:
         raise _validation("summary", "REQUIRED", "Write what was said on this call.")
     now = datetime.now(UTC)
+    _archive_previous_notes(db, lead, skip=payload.summary)
     call = LeadCall(
         lead_id=lead.id,
         user_id=actor.id,
@@ -763,7 +841,16 @@ def create_lead_call(
         context={"outcome": payload.outcome, "summary": payload.summary},
         ip_address=ip_address,
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.exception("lead_call_save_failed", extra={"lead_id": str(lead_id)})
+        raise AppError(
+            ErrorCode.CONFLICT,
+            "This call could not be saved. Try again.",
+            409,
+        ) from None
     db.refresh(call)
     return LeadCallPublic(
         id=str(call.id),
