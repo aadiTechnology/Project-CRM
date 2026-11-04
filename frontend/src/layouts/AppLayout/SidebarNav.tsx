@@ -18,7 +18,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom'
 
 import { roleLabel } from '../../access/role-label'
 import type { LeadList } from '../../leads/types'
-import { subscribeReminderBadge } from '../../reminders/reminder-badge'
+import { subscribeReminderBadge, subscribeReminderRefresh } from '../../reminders/reminder-badge'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
 import { SECTIONS, homePathForRoles, isNavActive, primaryRole, visibleNav, type NavItem } from './nav'
@@ -165,9 +165,11 @@ export function SidebarNav({
   const homePath = homePathForRoles(roles)
   const [reminderCount, setReminderCount] = useState(0)
   const [reminderOverride, setReminderOverride] = useState<number | null>(null)
+  const [badgeRefresh, setBadgeRefresh] = useState(0)
   const showReminders = items.some((item) => item.id === 'reminders')
 
   useEffect(() => subscribeReminderBadge(setReminderOverride), [])
+  useEffect(() => subscribeReminderRefresh(() => setBadgeRefresh((current) => current + 1)), [])
 
   useEffect(() => {
     if (!showReminders) {
@@ -190,7 +192,7 @@ export function SidebarNav({
     return () => {
       cancelled = true
     }
-  }, [pathname, showReminders])
+  }, [pathname, showReminders, badgeRefresh])
 
   return (
     <Stack sx={{ height: '100%' }}>

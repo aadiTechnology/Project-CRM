@@ -57,7 +57,41 @@ def _next_number(code: str, lead_count: int) -> str:
     return f"{code}-{lead_count + 1:04d}"
 
 
-def _to_public(project: Project, company_name: str, lead_count: int) -> ProjectPublic:
+def _next_from_numbers(code: str, numbers: list[str]) -> str:
+    prefix = f"{code}-"
+    highest = 0
+    for number in numbers:
+        if not number.startswith(prefix):
+            continue
+        suffix = number[len(prefix) :]
+        if suffix.isdigit():
+            highest = max(highest, int(suffix))
+    return f"{code}-{highest + 1:04d}"
+
+
+def _next_numbers(db: Session, projects: list[Project]) -> dict[uuid.UUID, str]:
+    if not projects:
+        return {}
+    grouped: dict[uuid.UUID, list[str]] = {project.id: [] for project in projects}
+    rows = db.execute(
+        select(Lead.project_id, Lead.lead_number).where(Lead.project_id.in_(grouped))
+    ).all()
+    for project_id, number in rows:
+        if project_id in grouped and number:
+            grouped[project_id].append(number)
+    by_id = {project.id: project for project in projects}
+    return {
+        project_id: _next_from_numbers(by_id[project_id].code, numbers)
+        for project_id, numbers in grouped.items()
+    }
+
+
+def _to_public(
+    project: Project,
+    company_name: str,
+    lead_count: int,
+    next_lead_number: str | None = None,
+) -> ProjectPublic:
     return ProjectPublic(
         id=str(project.id),
         company_id=str(project.company_id),
@@ -68,7 +102,7 @@ def _to_public(project: Project, company_name: str, lead_count: int) -> ProjectP
         description=project.description,
         status=project.status,
         lead_count=lead_count,
-        next_lead_number=_next_number(project.code, lead_count),
+        next_lead_number=next_lead_number or _next_number(project.code, lead_count),
     )
 
 
@@ -102,7 +136,11 @@ def list_projects(db: Session, actor: User) -> tuple[list[ProjectPublic], list[C
             .group_by(Lead.project_id)
         ).all()
         counts = {project_id: int(total) for project_id, total in count_rows if project_id is not None}
-    projects = [_to_public(project, company_name, counts.get(project.id, 0)) for project, company_name in rows]
+    next_numbers = _next_numbers(db, [project for project, _name in rows])
+    projects = [
+        _to_public(project, company_name, counts.get(project.id, 0), next_numbers.get(project.id))
+        for project, company_name in rows
+    ]
     if not can_create_projects(actor):
         return projects, []
     companies = list(
@@ -196,7 +234,7 @@ def update_project(
     )
     db.commit()
     db.refresh(project)
-    return _to_public(project, company.name, int(lead_count))
+    return _to_public(project, company.name, int(lead_count), _next_numbers(db, [project]).get(project.id))
 
 
 def delete_project(

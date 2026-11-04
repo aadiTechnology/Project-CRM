@@ -24,7 +24,7 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
@@ -136,6 +136,7 @@ export function RemindersPage() {
   const [notice, setNotice] = useState('')
   const [when, setWhen] = useState<WhenFilter>('ALL')
   const [projectId, setProjectId] = useState('')
+  const loadSeq = useRef(0)
   const [priority, setPriority] = useState('')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortBy>('time')
@@ -184,16 +185,19 @@ export function RemindersPage() {
   }, [])
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setError('')
     try {
       const params = new URLSearchParams({ limit: '500', exclude_lost: 'true' })
       if (projectId) params.set('project_id', projectId)
       const result = await api.get<LeadList>(`/api/v1/leads?${params}`)
+      if (seq !== loadSeq.current) return
       setLeads(result.data.items)
     } catch (requestError) {
+      if (seq !== loadSeq.current) return
       setError(requestError instanceof ApiError ? requestError.message : 'Could not load reminders.')
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [projectId])
 

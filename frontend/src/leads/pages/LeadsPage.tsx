@@ -43,6 +43,7 @@ import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManage
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
 import { ReminderLeadDrawer } from '../../reminders/components/ReminderLeadDrawer'
+import { refreshReminderBadge } from '../../reminders/reminder-badge'
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
@@ -150,6 +151,7 @@ export function LeadsPage() {
   const openLeadId = searchParams.get('open')
   const manageFieldsFromQuery = searchParams.get('manageFields') === '1'
   const openedFromQuery = useRef<string | null>(null)
+  const loadSeq = useRef(0)
   const { user } = useAuth()
   const canCreate = Boolean(user?.permissions.includes('leads.create'))
   const canUpdate = Boolean(user?.permissions.includes('leads.update'))
@@ -324,6 +326,7 @@ export function LeadsPage() {
   }, [])
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setError('')
     try {
       const params = new URLSearchParams()
@@ -335,12 +338,14 @@ export function LeadsPage() {
       params.set('limit', '100')
       const query = params.toString()
       const result = await api.get<LeadList>(`/api/v1/leads${query ? `?${query}` : ''}`)
+      if (seq !== loadSeq.current) return
       setItems(result.data.items)
       setTotal(result.data.total)
     } catch (requestError) {
+      if (seq !== loadSeq.current) return
       setError(requestError instanceof ApiError ? requestError.message : 'Could not load leads.')
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [priority, projectFilter, search, source, status])
 
@@ -452,6 +457,7 @@ export function LeadsPage() {
     async (message: string) => {
       setNotice(message)
       await load()
+      refreshReminderBadge()
     },
     [load],
   )
@@ -568,6 +574,7 @@ export function LeadsPage() {
       setNotice('Lead created.')
       await load()
       await loadProjects()
+      refreshReminderBadge()
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.details?.length) {
         const next: Record<string, string> = {}
@@ -1489,6 +1496,7 @@ export function LeadsPage() {
                     setProjectFilter(importProjectId)
                   }
                   await load()
+                  refreshReminderBadge()
                 } catch (requestError) {
                   setError(
                     requestError instanceof ApiError
@@ -1522,6 +1530,7 @@ export function LeadsPage() {
       >
         <Box
           component="form"
+          noValidate
           onSubmit={(event) => void onCreate(event)}
           sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}
         >
@@ -1630,6 +1639,7 @@ export function LeadsPage() {
             setNotice(`Lead deleted · ${deletedName}`)
             await load()
             await loadProjects()
+            refreshReminderBadge()
           } catch (err) {
             setError(err instanceof ApiError ? err.message : 'Could not delete lead.')
           } finally {

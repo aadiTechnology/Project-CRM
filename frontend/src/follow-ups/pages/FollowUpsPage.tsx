@@ -10,7 +10,7 @@ import {
   useMediaQuery,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
@@ -114,6 +114,7 @@ export function FollowUpsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [projectId, setProjectId] = useState('')
+  const loadSeq = useRef(0)
   const [search, setSearch] = useState('')
   const [dueFilter, setDueFilter] = useState<DueFilter>('ALL')
   const [dateFrom, setDateFrom] = useState('')
@@ -145,11 +146,13 @@ export function FollowUpsPage() {
   }, [])
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setError('')
     try {
       const params = new URLSearchParams({ limit: '200', exclude_lost: 'true' })
       if (projectId) params.set('project_id', projectId)
       const result = await api.get<LeadList>(`/api/v1/leads?${params}`)
+      if (seq !== loadSeq.current) return
       // Follow-up list = leads that still have a next date.
       const withDue = result.data.items.filter((lead) => Boolean(lead.next_followup_at))
       withDue.sort((a, b) => {
@@ -159,9 +162,10 @@ export function FollowUpsPage() {
       })
       setItems(withDue)
     } catch (requestError) {
+      if (seq !== loadSeq.current) return
       setError(requestError instanceof ApiError ? requestError.message : 'Could not load follow-ups.')
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [projectId])
 
