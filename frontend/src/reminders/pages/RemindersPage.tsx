@@ -28,6 +28,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
+import { buildGridTemplateFromColumns, gridMinWidthPx } from '../../column-visibility/definitions'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
@@ -106,13 +107,25 @@ export function RemindersPage() {
     isVisible: isColumnVisible,
     toggle: toggleColumn,
     reset: resetColumns,
-    gridTemplateMd: remindersGridMd,
     gridTemplateXs: remindersGridXs,
     loadError: columnLoadError,
     saveError: columnSaveError,
     clearSaveError: clearColumnSaveError,
     clearLoadError: clearColumnLoadError,
   } = useColumnVisibility('reminders')
+
+  const tableColumns = useMemo(
+    () => (canUpdate ? columnDefs : columnDefs.filter((col) => col.key !== 'actions')),
+    [canUpdate, columnDefs],
+  )
+  const remindersGridMd = useMemo(
+    () => buildGridTemplateFromColumns(tableColumns, columnVisibility),
+    [tableColumns, columnVisibility],
+  )
+  const remindersMinWidth = useMemo(
+    () => gridMinWidthPx(tableColumns, columnVisibility),
+    [tableColumns, columnVisibility],
+  )
 
   const [leads, setLeads] = useState<Lead[]>([])
   const [projects, setProjects] = useState<LeadProjectOption[]>([])
@@ -560,7 +573,8 @@ export function RemindersPage() {
             <Typography color="text.secondary">No reminders match these filters.</Typography>
           </Box>
         ) : (
-          <>
+          <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
+          <Box sx={{ minWidth: { md: remindersMinWidth } }}>
             <Box
               sx={{
                 display: { xs: 'none', md: 'grid' },
@@ -571,6 +585,7 @@ export function RemindersPage() {
                 px: 2,
                 py: 1,
                 bgcolor: '#f8fafc',
+                minWidth: 0,
               }}
             >
               <Checkbox
@@ -597,7 +612,7 @@ export function RemindersPage() {
               {isColumnVisible('priority') ? <Typography sx={columnHeaderSx}>Priority</Typography> : null}
               {isColumnVisible('due') ? <Typography sx={columnHeaderSx}>Due</Typography> : null}
               {isColumnVisible('status') ? <Typography sx={columnHeaderSx}>Status</Typography> : null}
-              <Typography sx={{ ...columnHeaderSx, textAlign: 'left' }}>Actions</Typography>
+              {canUpdate ? <Typography sx={{ ...columnHeaderSx, textAlign: 'left' }}>Actions</Typography> : null}
             </Box>
 
             {pageRows.map((lead) => {
@@ -620,6 +635,7 @@ export function RemindersPage() {
                     rowGap: 0.75,
                     alignItems: 'center',
                     width: '100%',
+                    minWidth: 0,
                     px: 2,
                     py: 1.1,
                     bgcolor: on ? '#eff6ff' : 'transparent',
@@ -672,6 +688,7 @@ export function RemindersPage() {
                       sx={{
                         gridColumn: { xs: '2', md: 'auto' },
                         ml: { xs: '54px', md: 0 },
+                        minWidth: 0,
                         color: 'text.secondary',
                       }}
                     >
@@ -685,6 +702,7 @@ export function RemindersPage() {
                       sx={{
                         gridColumn: { xs: '2', md: 'auto' },
                         ml: { xs: '54px', md: 0 },
+                        minWidth: 0,
                         color: 'primary.main',
                         fontWeight: 600,
                       }}
@@ -700,6 +718,7 @@ export function RemindersPage() {
                         justifySelf: 'start',
                         gridColumn: { xs: '2', md: 'auto' },
                         ml: { xs: '54px', md: 0 },
+                        minWidth: 0,
                         bgcolor: pri.bg,
                         color: pri.color,
                         fontWeight: 600,
@@ -715,6 +734,7 @@ export function RemindersPage() {
                         alignItems: 'center',
                         gridColumn: { xs: '2', md: 'auto' },
                         ml: { xs: '54px', md: 0 },
+                        minWidth: 0,
                         color: bucket === 'o' ? '#b91c1c' : bucket === 't' ? '#b45309' : '#334155',
                         fontWeight: bucket === 'o' || bucket === 't' ? 600 : 500,
                         fontSize: 13,
@@ -733,6 +753,7 @@ export function RemindersPage() {
                         justifySelf: 'start',
                         gridColumn: { xs: '2', md: 'auto' },
                         ml: { xs: '54px', md: 0 },
+                        minWidth: 0,
                         bgcolor: tone.bg,
                         color: tone.color,
                         fontWeight: 600,
@@ -749,6 +770,7 @@ export function RemindersPage() {
                       sx={{
                         gridColumn: { xs: '2', md: 'auto' },
                         justifyContent: 'flex-start',
+                        minWidth: 0,
                         ml: { xs: '54px', md: 0 },
                       }}
                     >
@@ -827,7 +849,8 @@ export function RemindersPage() {
                 </Box>
               )
             })}
-          </>
+          </Box>
+          </Box>
         )}
 
         <Stack direction="row" spacing={1} sx={{ px: 2, py: 1.5, alignItems: 'center', color: 'text.secondary' }}>
