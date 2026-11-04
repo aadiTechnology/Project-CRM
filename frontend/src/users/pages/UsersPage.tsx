@@ -345,12 +345,11 @@ export function UsersPage() {
 
       {filtered.length === 0 ? <Typography color="text.secondary">{t('access:noUsers')}</Typography> : null}
 
-      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px', bgcolor: '#fff', overflow: 'hidden' }}>
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '12px', bgcolor: '#fff', overflowX: 'auto' }}>
         <Table
           size="small"
           sx={{
-            tableLayout: 'fixed',
-            width: '100%',
+            minWidth: 760,
             '& .MuiTableCell-root': { borderBottom: 'none' },
           }}
         >
@@ -360,7 +359,7 @@ export function UsersPage() {
               <TableCell sx={{ width: '18%' }}>{t('access:organisation')}</TableCell>
               <TableCell sx={{ width: '18%' }}>{t('access:role')}</TableCell>
               <TableCell>{t('access:status')}</TableCell>
-              <TableCell sx={{ width: 120 }} align="right">
+              <TableCell sx={{ width: 168, whiteSpace: 'nowrap' }} align="right">
                 {t('access:actions')}
               </TableCell>
             </TableRow>
@@ -403,8 +402,8 @@ export function UsersPage() {
                       }}
                     />
                   </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end' }}>
+                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Stack direction="row" spacing={0.25} sx={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
                       <Tooltip title={t('access:changeRole')}>
                         <span>
                           <IconButton

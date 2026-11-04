@@ -20,6 +20,8 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -78,6 +80,8 @@ export function ProjectsPage() {
   const [status, setStatus] = useState('active')
   const [companyId, setCompanyId] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     setError('')
@@ -181,6 +185,24 @@ export function ProjectsPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api.delete<ProjectList>(`/api/v1/projects/${deleteTarget.id}`)
+      setData(result.data)
+      setNotice(result.message)
+      setDeleteTarget(null)
+    } catch (requestError) {
+      setDeleteTarget(null)
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not delete this project.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading && !data) return <LoadingScreen />
 
   return (
@@ -274,6 +296,25 @@ export function ProjectsPage() {
                     <EditOutlinedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 </Tooltip>
+              ) : null}
+              {data.can_create ? (
+                <DeleteIconButton
+                  onClick={() => {
+                    if (project.lead_count > 0) {
+                      setNotice('')
+                      setError('This project still has leads. Mark it inactive instead of deleting it.')
+                      return
+                    }
+                    setError('')
+                    setDeleteTarget(project)
+                  }}
+                  disabled={deleting}
+                  tooltip={
+                    project.lead_count > 0
+                      ? 'This project has leads. Mark it inactive instead.'
+                      : `Delete ${project.name}`
+                  }
+                />
               ) : null}
             </Stack>
           </Box>
@@ -411,6 +452,22 @@ export function ProjectsPage() {
           </DialogActions>
         </Box>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete project?'}
+        description={
+          deleteTarget && deleteTarget.lead_count > 0
+            ? 'This project still has leads, so it cannot be deleted. Mark it inactive instead.'
+            : 'This removes the project. It only works when the project has no leads.'
+        }
+        confirmLabel="Delete"
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        onConfirm={() => void confirmDelete()}
+      />
     </Stack>
   )
 }

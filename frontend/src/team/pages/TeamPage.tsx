@@ -22,6 +22,8 @@ import { useTheme } from '@mui/material/styles'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { PasswordField } from '../../auth/components/PasswordField'
+import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { DeleteIconButton } from '../../components/common/DeleteIconButton'
 import { ErrorAlert } from '../../components/common/ErrorAlert'
 import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { ApiError } from '../../services/api/errors'
@@ -74,6 +76,7 @@ export function TeamPage() {
   const [moveProjectId, setMoveProjectId] = useState('')
   const [fromUserId, setFromUserId] = useState('')
   const [toUserId, setToUserId] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<TeamPerson | null>(null)
 
   const load = useCallback(async (selectedCompany?: string) => {
     setError('')
@@ -168,6 +171,24 @@ export function TeamPage() {
       setNotice('Salesperson added.')
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : 'Could not add salesperson.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function confirmDeleteSalesperson() {
+    if (!deleteTarget) return
+    setSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await api.delete<TeamBoard>(`/api/v1/team/salespeople/${deleteTarget.id}`)
+      setBoard(result.data)
+      setNotice(result.message || 'Salesperson deleted.')
+      setDeleteTarget(null)
+    } catch (requestError) {
+      setDeleteTarget(null)
+      setError(requestError instanceof ApiError ? requestError.message : 'Could not delete this salesperson.')
     } finally {
       setSaving(false)
     }
@@ -287,10 +308,21 @@ export function TeamPage() {
               {people.map((person) => (
                 <TableRow key={person.id}>
                   <TableCell>
-                    <Typography fontWeight={600}>{person.full_name}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {person.email}
-                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography fontWeight={600}>{person.full_name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {person.email}
+                        </Typography>
+                      </Box>
+                      {!isPlatform && person.role === 'SALESPERSON' ? (
+                        <DeleteIconButton
+                          onClick={() => setDeleteTarget(person)}
+                          disabled={saving}
+                          tooltip={`Delete ${person.full_name}`}
+                        />
+                      ) : null}
+                    </Stack>
                   </TableCell>
                   {projects.map((project) => {
                     const checked = assigned.has(assignmentKey(project.id, person.id))
@@ -495,6 +527,18 @@ export function TeamPage() {
           </DialogActions>
         </Box>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget ? `Delete ${deleteTarget.full_name}?` : 'Delete salesperson?'}
+        description="They will not be able to sign in. This only works when they have no leads. Move their leads first."
+        confirmLabel="Delete"
+        loading={saving}
+        onCancel={() => {
+          if (!saving) setDeleteTarget(null)
+        }}
+        onConfirm={() => void confirmDeleteSalesperson()}
+      />
     </Stack>
   )
 }

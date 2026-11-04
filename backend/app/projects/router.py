@@ -9,7 +9,7 @@ from app.auth.dependencies import client_ip, get_current_user
 from app.common.responses import ApiResponse, error_responses
 from app.core.database import get_db
 from app.projects.schemas import CompanyOption, CreateProjectRequest, ProjectListData, UpdateProjectRequest
-from app.projects.service import can_create_projects, create_project, list_projects, update_project
+from app.projects.service import can_create_projects, create_project, delete_project, list_projects, update_project
 from app.users.models import User
 
 router = APIRouter()
@@ -91,4 +91,32 @@ def patch_project(
             items=projects,
         ),
         message=f"{updated.name} is updated.",
+    )
+
+
+@router.delete(
+    "/{project_id}",
+    response_model=ApiResponse[ProjectListData],
+    summary="Delete a project",
+    description=(
+        "A Super Admin deletes a project that has no leads. "
+        "A project that already has leads must be marked inactive instead."
+    ),
+    responses=error_responses(401, 403, 404, 409),
+)
+def remove_project(
+    project_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+) -> ApiResponse[ProjectListData]:
+    name = delete_project(db, actor, project_id, client_ip(request))
+    projects, companies = list_projects(db, actor)
+    return ApiResponse(
+        data=ProjectListData(
+            can_create=True,
+            companies=[CompanyOption(id=str(company.id), name=company.name, status=company.status) for company in companies],
+            items=projects,
+        ),
+        message=f"{name} is deleted.",
     )

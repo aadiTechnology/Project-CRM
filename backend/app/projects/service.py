@@ -197,3 +197,44 @@ def update_project(
     db.commit()
     db.refresh(project)
     return _to_public(project, company.name, int(lead_count))
+
+
+def delete_project(
+    db: Session,
+    actor: User,
+    project_id: uuid.UUID,
+    ip_address: str | None,
+) -> str:
+    if not can_create_projects(actor):
+        raise _forbidden()
+    project = db.get(Project, project_id)
+    if project is None:
+        raise AppError(ErrorCode.NOT_FOUND, "Project not found.", 404)
+    lead_count = db.scalar(select(func.count()).select_from(Lead).where(Lead.project_id == project.id)) or 0
+    if int(lead_count) > 0:
+        raise AppError(
+            ErrorCode.CONFLICT,
+            "This project still has leads. Mark it inactive instead of deleting it.",
+            409,
+        )
+    name = project.name
+    record_audit(
+        db,
+        action="project_deleted",
+        actor_id=actor.id,
+        target_type="project",
+        target_id=project.id,
+        context={"name": name, "code": project.code},
+        ip_address=ip_address,
+    )
+    db.delete(project)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AppError(
+            ErrorCode.CONFLICT,
+            "This project still has leads. Mark it inactive instead of deleting it.",
+            409,
+        ) from exc
+    return name

@@ -1,13 +1,15 @@
 """Team board: assign projects to owners / salespeople, add reps, move leads."""
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.audit.service import record_audit
+from app.auth.tokens import revoke_all_refresh_tokens
 from app.common.exceptions import AppError, ErrorCode
 from app.core.logging import log_event
 from app.core.security import hash_password
@@ -29,8 +31,6 @@ from app.team.schemas import (
 )
 from app.users.models import User
 from app.users.service import _password_error
-
-import logging
 
 logger = logging.getLogger("app.team")
 
@@ -460,6 +460,52 @@ def create_salesperson(
     )
     db.commit()
     log_event(logger, "salesperson_created", actor_id=str(actor.id), target_id=str(user.id))
+    return get_team_board(db, actor)
+
+
+def remove_salesperson(
+    db: Session,
+    actor: User,
+    user_id: uuid.UUID,
+    ip_address: str | None,
+) -> TeamBoardData:
+    if not _is_owner(actor) or actor.company_id is None:
+        raise _forbidden()
+    target = db.get(User, user_id)
+    if (
+        target is None
+        or not target.is_active
+        or target.company_id != actor.company_id
+        or RoleName.SALESPERSON not in _role_names(target)
+        or _role_names(target) & {RoleName.BUSINESS_OWNER, RoleName.SUPER_ADMIN}
+    ):
+        raise AppError(ErrorCode.NOT_FOUND, "Salesperson not found.", 404)
+    lead_count = db.scalar(
+        select(func.count()).select_from(Lead).where(Lead.owner_id == target.id, Lead.is_deleted.is_(False))
+    ) or 0
+    if int(lead_count) > 0:
+        raise AppError(
+            ErrorCode.CONFLICT,
+            "This salesperson still has leads. Move the leads, then delete them.",
+            409,
+        )
+    now = datetime.now(UTC)
+    db.execute(delete(ProjectMember).where(ProjectMember.user_id == target.id))
+    target.is_active = False
+    target.session_version += 1
+    target.updated_at = now
+    revoke_all_refresh_tokens(db, target.id, now)
+    record_audit(
+        db,
+        action="salesperson_deleted",
+        actor_id=actor.id,
+        target_type="user",
+        target_id=target.id,
+        context={"email": target.email},
+        ip_address=ip_address,
+    )
+    db.commit()
+    log_event(logger, "salesperson_deleted", actor_id=str(actor.id), target_id=str(target.id))
     return get_team_board(db, actor)
 
 

@@ -3,8 +3,11 @@
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import select
+
 from app.core.database import SessionLocal
 from app.core.security import hash_password
+from app.leads.models import Lead
 from app.organization.models import ACTIVE, Company
 from app.roles.models import UserRole
 from app.roles.service import get_role_by_name
@@ -158,3 +161,63 @@ async def test_super_admin_edits_a_project_and_owner_cannot(client):
     assert (await login(client, email="campus-owner@example.com")).status_code == 200
     visible = await client.get("/api/v1/projects")
     assert [project["code"] for project in visible.json()["data"]["items"]] == ["ADMIT"]
+
+
+async def test_super_admin_deletes_an_empty_project_and_keeps_one_with_leads(client):
+    company_id = _add_company("Delete Co")
+    _add_member("deleter@example.com", "SUPER_ADMIN")
+    _add_member("keep-owner@example.com", "BUSINESS_OWNER", company_id)
+
+    assert (await login(client, email="deleter@example.com")).status_code == 200
+    created = await client.post(
+        "/api/v1/projects",
+        json={"name": "Empty", "code": "EMPTY", "company_id": str(company_id), "template": "GENERIC"},
+        headers=await csrf_headers(client),
+    )
+    assert created.status_code == 200, created.text
+    project_id = next(item["id"] for item in created.json()["data"]["items"] if item["code"] == "EMPTY")
+
+    assert (await login(client, email="keep-owner@example.com")).status_code == 200
+    blocked = await client.delete(f"/api/v1/projects/{project_id}", headers=await csrf_headers(client))
+    assert blocked.status_code == 403
+
+    assert (await login(client, email="deleter@example.com")).status_code == 200
+    deleted = await client.delete(f"/api/v1/projects/{project_id}", headers=await csrf_headers(client))
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["message"] == "Empty is deleted."
+    assert all(item["id"] != project_id for item in deleted.json()["data"]["items"])
+
+    again = await client.post(
+        "/api/v1/projects",
+        json={"name": "With leads", "code": "KEEP", "company_id": str(company_id), "template": "GENERIC"},
+        headers=await csrf_headers(client),
+    )
+    kept_id = next(item["id"] for item in again.json()["data"]["items"] if item["code"] == "KEEP")
+    db = SessionLocal()
+    try:
+        now = _now()
+        owner = db.scalar(select(User).where(User.email == "keep-owner@example.com"))
+        assert owner is not None
+        db.add(
+            Lead(
+                company_id=company_id,
+                project_id=uuid.UUID(kept_id),
+                lead_number="KEEP-0001",
+                full_name="Kept Lead",
+                mobile="9000000099",
+                owner_id=owner.id,
+                created_by_id=owner.id,
+                status="new",
+                priority="medium",
+                plan_step="Day 1",
+                is_deleted=False,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    refused = await client.delete(f"/api/v1/projects/{kept_id}", headers=await csrf_headers(client))
+    assert refused.status_code == 409

@@ -324,3 +324,43 @@ async def test_unassign_moves_leads_when_one_salesperson_remains(client):
         assert stored.owner_id == demo_id
     finally:
         db.close()
+
+
+async def test_owner_deletes_salesperson_without_leads(client):
+    company_id = _add_company("Delete Team")
+    _add_member("team-owner@example.com", "BUSINESS_OWNER", company_id)
+    spare_id = _add_member("spare@example.com", "SALESPERSON", company_id)
+    busy_id = _add_member("busy@example.com", "SALESPERSON", company_id)
+
+    assert (await login(client, email="team-owner@example.com")).status_code == 200
+    deleted = await client.delete(f"/api/v1/team/salespeople/{spare_id}", headers=await csrf_headers(client))
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["message"] == "Salesperson deleted."
+    assert all(person["id"] != str(spare_id) for person in deleted.json()["data"]["people"])
+    assert (await login(client, email="spare@example.com")).status_code == 403
+
+    assert (await login(client, email="team-owner@example.com")).status_code == 200
+    db = SessionLocal()
+    try:
+        now = _now()
+        db.add(
+            Lead(
+                company_id=company_id,
+                lead_number="TEAM-0001",
+                full_name="Busy Lead",
+                mobile="9000000088",
+                owner_id=busy_id,
+                created_by_id=busy_id,
+                status="new",
+                priority="medium",
+                plan_step="Day 1",
+                is_deleted=False,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+    refused = await client.delete(f"/api/v1/team/salespeople/{busy_id}", headers=await csrf_headers(client))
+    assert refused.status_code == 409

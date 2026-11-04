@@ -15,7 +15,7 @@ from app.team.schemas import (
     SetAssignmentRequest,
     TeamBoardData,
 )
-from app.team.service import create_salesperson, get_team_board, move_leads, set_assignment
+from app.team.service import create_salesperson, get_team_board, move_leads, remove_salesperson, set_assignment
 from app.users.models import User
 
 router = APIRouter()
@@ -73,6 +73,26 @@ def post_salesperson(
 ) -> ApiResponse[TeamBoardData]:
     board = create_salesperson(db, actor, payload, client_ip(request))
     return ApiResponse(data=board, message="Salesperson added.")
+
+
+@router.delete(
+    "/salespeople/{user_id}",
+    response_model=ApiResponse[TeamBoardData],
+    summary="Remove a salesperson",
+    description=(
+        "A Business Owner deactivates a salesperson in their company. "
+        "The account is kept. This fails while that person still owns leads."
+    ),
+    responses=error_responses(401, 403, 404, 409),
+)
+def delete_salesperson(
+    user_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    actor: User = Depends(get_current_user),
+) -> ApiResponse[TeamBoardData]:
+    board = remove_salesperson(db, actor, user_id, client_ip(request))
+    return ApiResponse(data=board, message="Salesperson deleted.")
 
 
 @router.post(
