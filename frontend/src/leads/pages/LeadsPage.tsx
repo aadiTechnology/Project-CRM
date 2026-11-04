@@ -28,7 +28,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import { ColumnChooser } from '../../column-visibility/ColumnChooser'
-import type { ColumnDef } from '../../column-visibility/definitions'
+import { buildGridTemplateFromColumns, gridMinWidthPx, type ColumnDef } from '../../column-visibility/definitions'
 import { useColumnVisibility } from '../../column-visibility/useColumnVisibility'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { DeleteIconButton } from '../../components/common/DeleteIconButton'
@@ -38,7 +38,7 @@ import { columnHeaderSx } from '../../components/common/tableStyles'
 import { toolbarIconSx } from '../../components/common/toolbarStyles'
 import { FollowupPlanSettingsDialog } from '../../followup-plan/FollowupPlanSettingsDialog'
 import { FollowupPlanStep, loadFollowupPlan } from '../../followup-plan/plan'
-import { isDuplicateBuiltinLeadField } from '../../lead-fields/builtinLabels'
+import { isDuplicateBuiltinLeadField, resolveCallSummary } from '../../lead-fields/builtinLabels'
 import { LeadFieldsManager } from '../../lead-fields/components/LeadFieldsManager'
 import type { LeadField, LeadFieldList } from '../../lead-fields/types'
 import { OPTION_TYPES } from '../../lead-fields/types'
@@ -46,7 +46,7 @@ import { ReminderLeadDrawer } from '../../reminders/components/ReminderLeadDrawe
 import { ApiError } from '../../services/api/errors'
 import { api } from '../../services/api/client'
 import { useAuth } from '../../store/auth-context'
-import { defaultFollowupLocal, formatDueLabel, localInputToIso } from '../lead-dates'
+import { defaultFollowupLocal, formatDueLabel, formatEnquiryDate, localInputToIso } from '../lead-dates'
 import {
   LEAD_PRIORITIES,
   LEAD_SOURCES,
@@ -85,6 +85,12 @@ function ToneChip({
     />
   )
 }
+
+const leadCellSx = {
+  gridColumn: { xs: '1', md: 'auto' },
+  color: 'text.secondary',
+  minWidth: 0,
+} as const
 
 type LeadForm = {
   project_id: string
@@ -225,13 +231,25 @@ export function LeadsPage() {
     isVisible: isColumnVisible,
     toggle: toggleColumn,
     reset: resetColumns,
-    gridTemplateMd: leadsGridMd,
     gridTemplateXs: leadsGridXs,
     loadError: columnLoadError,
     saveError: columnSaveError,
     clearSaveError: clearColumnSaveError,
     clearLoadError: clearColumnLoadError,
   } = useColumnVisibility('leads', extraColumnDefs)
+
+  const tableColumns = useMemo(
+    () => (canDelete ? columnDefs : columnDefs.filter((col) => col.key !== 'actions')),
+    [canDelete, columnDefs],
+  )
+  const tableGridMd = useMemo(
+    () => buildGridTemplateFromColumns(tableColumns, columnVisibility),
+    [tableColumns, columnVisibility],
+  )
+  const leadsMinWidth = useMemo(
+    () => gridMinWidthPx(tableColumns, columnVisibility),
+    [tableColumns, columnVisibility],
+  )
 
   useEffect(() => {
     if (!notice) return
@@ -940,7 +958,7 @@ export function LeadsPage() {
             </span>
           </Tooltip>
           <ColumnChooser
-            columns={columnDefs}
+            columns={tableColumns}
             visibility={columnVisibility}
             onToggle={toggleColumn}
             onReset={resetColumns}
@@ -1079,11 +1097,11 @@ export function LeadsPage() {
           </Typography>
         ) : (
           <Box sx={{ overflowX: { xs: 'visible', md: 'auto' } }}>
-            <Box sx={{ minWidth: { md: columnFieldsUnion.length > 0 ? 900 : 0 } }}>
+            <Box sx={{ minWidth: { md: leadsMinWidth } }}>
               <Box
                 sx={{
                   display: { xs: 'none', md: 'grid' },
-                  gridTemplateColumns: leadsGridMd,
+                  gridTemplateColumns: tableGridMd,
                   columnGap: 1.25,
                   alignItems: 'center',
                   px: 2,
@@ -1091,21 +1109,17 @@ export function LeadsPage() {
                   bgcolor: '#f8fafc',
                 }}
               >
-                <Typography sx={columnHeaderSx}>Lead</Typography>
-                {isColumnVisible('project') ? <Typography sx={columnHeaderSx}>Project</Typography> : null}
-                {isColumnVisible('phone') ? <Typography sx={columnHeaderSx}>Phone</Typography> : null}
-                {isColumnVisible('status') ? <Typography sx={columnHeaderSx}>Status</Typography> : null}
-                {isColumnVisible('priority') ? <Typography sx={columnHeaderSx}>Priority</Typography> : null}
-                {isColumnVisible('follow_up') ? <Typography sx={columnHeaderSx}>Follow-up</Typography> : null}
-                {isColumnVisible('source') ? <Typography sx={columnHeaderSx}>Source</Typography> : null}
-                {columnFieldsUnion.map((field) =>
-                  isColumnVisible(`extra:${field.key}`) ? (
-                    <Typography key={field.id} noWrap sx={columnHeaderSx}>
-                      {field.label}
+                {tableColumns.map((col) =>
+                  isColumnVisible(col.key) ? (
+                    <Typography
+                      key={col.key}
+                      noWrap
+                      sx={{ ...columnHeaderSx, textAlign: col.key === 'actions' ? 'right' : 'left' }}
+                    >
+                      {col.label}
                     </Typography>
                   ) : null,
                 )}
-                <Typography sx={{ ...columnHeaderSx, textAlign: 'right' }}>Actions</Typography>
               </Box>
               {pageRows.map((lead) => {
                 const clickable = canUpdate || isOwner
@@ -1115,6 +1129,8 @@ export function LeadsPage() {
                 const leadColumnKeys = new Set(
                   leadProjectFields.filter((field) => field.is_active && field.show_as_column).map((field) => field.key),
                 )
+                const requirement = (lead.requirement ?? '').replace(/\s+/g, ' ').trim()
+                const callSummary = resolveCallSummary(lead.call_summary, lead.extra_values).replace(/\s+/g, ' ').trim()
                 return (
                   <Box
                     key={lead.id}
@@ -1125,7 +1141,7 @@ export function LeadsPage() {
                       display: 'grid',
                       gridTemplateColumns: {
                         xs: leadsGridXs,
-                        md: leadsGridMd,
+                        md: tableGridMd,
                       },
                       columnGap: 1.25,
                       rowGap: 0.75,
@@ -1136,104 +1152,141 @@ export function LeadsPage() {
                       '&:hover': { bgcolor: '#f8fbff' },
                     }}
                   >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography fontWeight={700} noWrap>
-                        {lead.full_name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap display="block">
-                        {lead.lead_number}
-                        {lead.city ? ` · ${lead.city}` : ''}
-                      </Typography>
-                      {leadSubtitleFields.length > 0 ? (
-                        <Typography variant="caption" color="text.secondary" noWrap display="block">
-                          {leadSubtitleFields
-                            .map((field) => `${field.label}: ${formatExtraDisplay(lead.extra_values?.[field.key])}`)
-                            .join(' · ')}
-                        </Typography>
-                      ) : null}
-                    </Box>
-                    {isColumnVisible('project') ? (
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
-                      >
-                        {lead.project_name || '—'}
-                      </Typography>
-                    ) : null}
-                    {isColumnVisible('phone') ? (
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'primary.main', fontWeight: 600 }}
-                      >
-                        {lead.mobile || '—'}
-                      </Typography>
-                    ) : null}
-                    {isColumnVisible('status') ? (
-                      <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
-                        <ToneChip label={STATUS_LABEL[lead.status] ?? lead.status} {...statusTone} />
-                      </Box>
-                    ) : null}
-                    {isColumnVisible('priority') ? (
-                      <Box sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
-                        <ToneChip label={PRIORITY_LABEL[lead.priority]} {...PRIORITY_TONE[lead.priority]} />
-                      </Box>
-                    ) : null}
-                    {isColumnVisible('follow_up') ? (
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        sx={{
-                          alignItems: 'center',
-                          gridColumn: { xs: '1', md: 'auto' },
-                          fontSize: 13,
-                          color: 'text.secondary',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <TodayOutlinedIcon sx={{ fontSize: 15 }} />
-                        {formatDueLabel(lead.next_followup_at)}
-                      </Stack>
-                    ) : null}
-                    {isColumnVisible('source') ? (
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
-                      >
-                        {lead.lead_source || '—'}
-                      </Typography>
-                    ) : null}
-                    {columnFieldsUnion.map((field) =>
-                      isColumnVisible(`extra:${field.key}`) ? (
-                        <Typography
-                          key={field.id}
-                          variant="body2"
-                          noWrap
-                          sx={{ gridColumn: { xs: '1', md: 'auto' }, color: 'text.secondary' }}
+                    {tableColumns.map((col) => {
+                      if (!isColumnVisible(col.key)) return null
+                      if (col.key === 'lead') {
+                        return (
+                          <Box key={col.key} sx={{ minWidth: 0 }}>
+                            <Typography fontWeight={700} noWrap>
+                              {lead.full_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap display="block">
+                              {lead.lead_number}
+                              {lead.city ? ` · ${lead.city}` : ''}
+                            </Typography>
+                            {leadSubtitleFields.length > 0 ? (
+                              <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                {leadSubtitleFields
+                                  .map((field) => `${field.label}: ${formatExtraDisplay(lead.extra_values?.[field.key])}`)
+                                  .join(' · ')}
+                              </Typography>
+                            ) : null}
+                          </Box>
+                        )
+                      }
+                      if (col.key === 'project') {
+                        return (
+                          <Typography key={col.key} variant="body2" noWrap sx={leadCellSx}>
+                            {lead.project_name || '—'}
+                          </Typography>
+                        )
+                      }
+                      if (col.key === 'phone') {
+                        return (
+                          <Typography
+                            key={col.key}
+                            variant="body2"
+                            noWrap
+                            sx={{ ...leadCellSx, color: 'primary.main', fontWeight: 600 }}
+                          >
+                            {lead.mobile || '—'}
+                          </Typography>
+                        )
+                      }
+                      if (col.key === 'requirement') {
+                        return (
+                          <Tooltip key={col.key} title={requirement} disableHoverListener={!requirement}>
+                            <Typography variant="body2" noWrap sx={leadCellSx}>
+                              {requirement || '—'}
+                            </Typography>
+                          </Tooltip>
+                        )
+                      }
+                      if (col.key === 'status') {
+                        return (
+                          <Box key={col.key} sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
+                            <ToneChip label={STATUS_LABEL[lead.status] ?? lead.status} {...statusTone} />
+                          </Box>
+                        )
+                      }
+                      if (col.key === 'priority') {
+                        return (
+                          <Box key={col.key} sx={{ gridColumn: { xs: '1', md: 'auto' } }}>
+                            <ToneChip label={PRIORITY_LABEL[lead.priority]} {...PRIORITY_TONE[lead.priority]} />
+                          </Box>
+                        )
+                      }
+                      if (col.key === 'enquiry_date') {
+                        return (
+                          <Typography key={col.key} variant="body2" noWrap sx={leadCellSx}>
+                            {formatEnquiryDate(lead.enquiry_date)}
+                          </Typography>
+                        )
+                      }
+                      if (col.key === 'follow_up') {
+                        return (
+                          <Stack
+                            key={col.key}
+                            direction="row"
+                            spacing={0.5}
+                            sx={{
+                              alignItems: 'center',
+                              gridColumn: { xs: '1', md: 'auto' },
+                              fontSize: 13,
+                              color: 'text.secondary',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <TodayOutlinedIcon sx={{ fontSize: 15 }} />
+                            {formatDueLabel(lead.next_followup_at)}
+                          </Stack>
+                        )
+                      }
+                      if (col.key === 'source') {
+                        return (
+                          <Typography key={col.key} variant="body2" noWrap sx={leadCellSx}>
+                            {lead.lead_source || '—'}
+                          </Typography>
+                        )
+                      }
+                      if (col.key === 'call_summary') {
+                        return (
+                          <Tooltip key={col.key} title={callSummary} disableHoverListener={!callSummary}>
+                            <Typography variant="body2" noWrap sx={leadCellSx}>
+                              {callSummary || '—'}
+                            </Typography>
+                          </Tooltip>
+                        )
+                      }
+                      if (col.key.startsWith('extra:')) {
+                        const fieldKey = col.key.slice('extra:'.length)
+                        return (
+                          <Typography key={col.key} variant="body2" noWrap sx={leadCellSx}>
+                            {leadColumnKeys.has(fieldKey)
+                              ? formatExtraDisplay(lead.extra_values?.[fieldKey])
+                              : '—'}
+                          </Typography>
+                        )
+                      }
+                      return (
+                        <Box
+                          key={col.key}
+                          sx={{
+                            justifySelf: { xs: 'start', md: 'end' },
+                            gridColumn: { xs: '1', md: 'auto' },
+                          }}
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          {leadColumnKeys.has(field.key)
-                            ? formatExtraDisplay(lead.extra_values?.[field.key])
-                            : '—'}
-                        </Typography>
-                      ) : null,
-                    )}
-                    <Box
-                      sx={{
-                        justifySelf: { xs: 'start', md: 'end' },
-                        gridColumn: { xs: '1', md: 'auto' },
-                      }}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {canDelete ? (
-                        <DeleteIconButton
-                          onClick={() => setDeleteTarget(lead)}
-                          disabled={deleting}
-                          tooltip={`Delete ${lead.full_name}`}
-                        />
-                      ) : null}
-                    </Box>
+                          {canDelete ? (
+                            <DeleteIconButton
+                              onClick={() => setDeleteTarget(lead)}
+                              disabled={deleting}
+                              tooltip={`Delete ${lead.full_name}`}
+                            />
+                          ) : null}
+                        </Box>
+                      )
+                    })}
                   </Box>
                 )
               })}

@@ -10,14 +10,17 @@ export type ColumnDef = {
 
 export const SCREEN_COLUMNS: Record<ColumnScreen, ColumnDef[]> = {
   leads: [
-    { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(0,1.4fr)' },
+    { key: 'lead', label: 'Lead', hideable: false, track: 'minmax(180px,1.1fr)' },
     { key: 'project', label: 'Project', hideable: true, track: '120px' },
-    { key: 'phone', label: 'Phone', hideable: true, track: '120px' },
+    { key: 'phone', label: 'Mobile', hideable: true, track: '130px' },
+    { key: 'requirement', label: 'Requirement', hideable: true, track: 'minmax(160px,1fr)' },
     { key: 'status', label: 'Status', hideable: true, track: '104px' },
-    { key: 'priority', label: 'Priority', hideable: true, track: '84px' },
-    { key: 'follow_up', label: 'Follow-up', hideable: true, track: '100px' },
-    { key: 'source', label: 'Source', hideable: true, track: '96px' },
-    { key: 'actions', label: 'Actions', hideable: false, track: '44px' },
+    { key: 'priority', label: 'Priority', hideable: true, track: '88px' },
+    { key: 'enquiry_date', label: 'Enquiry Date', hideable: true, track: '124px' },
+    { key: 'follow_up', label: 'Next Follow-up', hideable: true, track: '124px' },
+    { key: 'source', label: 'Lead Source', hideable: true, track: '130px' },
+    { key: 'call_summary', label: 'Call Summary', hideable: true, track: 'minmax(200px,1.3fr)' },
+    { key: 'actions', label: 'Actions', hideable: false, track: '52px' },
   ],
   reminders: [
     { key: 'checkbox', label: 'Select', hideable: false, track: '22px' },
@@ -58,9 +61,31 @@ export function buildGridTemplate(screen: ColumnScreen, visibility: Record<strin
   return buildGridTemplateFromColumns(SCREEN_COLUMNS[screen], visibility)
 }
 
-/** Append custom lead-field columns after the base Leads columns. */
+function trackMinPx(track: string): number {
+  const minmax = /minmax\((\d+)px/.exec(track)
+  if (minmax) return Number(minmax[1])
+  const px = /^(\d+)px$/.exec(track)
+  if (px) return Number(px[1])
+  return 120
+}
+
+/** Minimum table width so extra columns scroll instead of squeezing. */
+export function gridMinWidthPx(
+  columns: readonly ColumnDef[],
+  visibility: Record<string, boolean>,
+  gapPx = 10,
+): number {
+  const visible = columns.filter((col) => visibility[col.key] !== false)
+  const tracks = visible.reduce((sum, col) => sum + trackMinPx(col.track), 0)
+  const gaps = Math.max(0, visible.length - 1) * gapPx
+  return tracks + gaps + 32
+}
+
+/** Insert custom lead-field columns before Actions so the grid matches the row. */
 export function mergeLeadsColumns(extraColumns: readonly ColumnDef[]): ColumnDef[] {
   const base = SCREEN_COLUMNS.leads
   if (!extraColumns.length) return [...base]
-  return [...base, ...extraColumns]
+  const actionsAt = base.findIndex((col) => col.key === 'actions')
+  if (actionsAt < 0) return [...base, ...extraColumns]
+  return [...base.slice(0, actionsAt), ...extraColumns, ...base.slice(actionsAt)]
 }

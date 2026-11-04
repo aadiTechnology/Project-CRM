@@ -20,6 +20,15 @@ export function followWhen(value: string | null | undefined, now = new Date()): 
   return 'u'
 }
 
+/** Date-only display that does not shift the calendar day across time zones. */
+export function formatEnquiryDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+  if (!match) return value.slice(0, 10)
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export function formatDueLabel(value: string | null | undefined, now = new Date()): string {
   const due = parseFollowup(value)
   if (!due) return '—'
