@@ -32,28 +32,112 @@ from app.users.router import router as users_router
 logger = logging.getLogger("app.main")
 
 
+_FIELD_LABELS = {
+    "address": "Address",
+    "alternate_mobile": "Alternate mobile",
+    "call_summary": "Call summary",
+    "city": "City",
+    "code": "Short code",
+    "company_id": "Business",
+    "company_name": "Company",
+    "description": "Description",
+    "email": "Email",
+    "enquiry_date": "Enquiry date",
+    "expected_value": "Expected value",
+    "full_name": "Name",
+    "gst_number": "GST number",
+    "industry": "Industry",
+    "label": "Field name",
+    "lead_source": "Lead source",
+    "manager_id": "Manager",
+    "mobile": "Mobile number",
+    "name": "Name",
+    "next_followup_at": "Follow-up date",
+    "owner_id": "Owner",
+    "password": "Password",
+    "phone": "Phone",
+    "plan_label": "Plan",
+    "priority": "Priority",
+    "project_id": "Project",
+    "reference_name": "Reference",
+    "remarks": "Remarks",
+    "requirement": "Requirement",
+    "role": "Role",
+    "status": "Status",
+    "summary": "Call note",
+    "team_id": "Team",
+    "template": "Template",
+    "to_user_id": "Salesperson",
+    "user_id": "Person",
+    "website": "Website",
+}
+
+
+def _field_label(field: str) -> str:
+    leaf = field.split(".")[-1]
+    if leaf in _FIELD_LABELS:
+        return _FIELD_LABELS[leaf]
+    words = leaf.replace("_", " ").strip()
+    if not words or words == "request":
+        return "This"
+    return words[:1].upper() + words[1:]
+
+
+def _plain_validation(field: str, error_type: str, raw: str) -> tuple[str, str]:
+    label = _field_label(field)
+    cleaned = raw.removeprefix("Value error, ").strip().rstrip(".")
+    if error_type == "missing":
+        if label == "This":
+            return "REQUIRED", "This field is required."
+        return "REQUIRED", f"{label} is required."
+    if field == "preferred_language":
+        return "UNSUPPORTED_LANGUAGE", "Language must be English, Marathi, or Hindi."
+    if "email" in error_type or field.endswith("email"):
+        return "INVALID_EMAIL", "Enter a valid email address."
+    if error_type == "value_error" and cleaned and "value error" not in cleaned.lower():
+        return "INVALID", f"{cleaned}."
+    if "too_short" in error_type:
+        return "TOO_SHORT", f"{label} is too short."
+    if "too_long" in error_type:
+        return "TOO_LONG", f"{label} is too long."
+    if "date" in error_type or "datetime" in error_type:
+        return "INVALID_DATE", f"Enter a valid {label.lower()}."
+    if "url" in error_type:
+        return "INVALID_URL", "Enter a valid website."
+    if (
+        error_type.startswith("greater")
+        or error_type.startswith("less")
+        or "decimal" in error_type
+        or error_type in {"int_parsing", "float_parsing", "int_type", "float_type"}
+    ):
+        return "INVALID_NUMBER", f"Enter a valid number for {label.lower()}."
+    if "enum" in error_type or "literal" in error_type:
+        return "INVALID_CHOICE", f"Choose a valid {label.lower()}."
+    if label == "This":
+        return "INVALID", "Enter a valid value."
+    return "INVALID", f"Enter a valid {label.lower()}."
+
+
 def _validation_details(exc: RequestValidationError) -> list[dict[str, str]]:
     details: list[dict[str, str]] = []
     for error in exc.errors():
         loc = [str(part) for part in error.get("loc", []) if part not in {"body", "query", "path"}]
         field = ".".join(loc) or "request"
         error_type = str(error.get("type", "invalid"))
-        code = "INVALID"
-        message = "Invalid value."
-        if error_type == "missing":
-            code = "REQUIRED"
-            message = "This field is required."
-        elif "email" in error_type or (field == "email" and error_type != "missing"):
-            code = "INVALID_EMAIL"
-            message = "Enter a valid email address."
-        elif field == "full_name":
-            code = "TOO_SHORT"
-            message = "Full name must be at least 2 characters."
-        elif field == "preferred_language":
-            code = "UNSUPPORTED_LANGUAGE"
-            message = "Language must be English, Marathi, or Hindi."
+        code, message = _plain_validation(field, error_type, str(error.get("msg", "")))
         details.append({"field": field, "code": code, "message": message})
     return details
+
+
+def _validation_message(details: list[dict[str, str]]) -> str:
+    seen: list[str] = []
+    for detail in details:
+        message = detail["message"]
+        if message and message not in seen:
+            seen.append(message)
+    if not seen:
+        return "Please correct the highlighted fields."
+    return " ".join(seen[:4])
 
 
 @asynccontextmanager
@@ -92,12 +176,13 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        details = _validation_details(exc)
         return JSONResponse(
             status_code=422,
             content=error_content(
                 ErrorCode.VALIDATION_ERROR,
-                "Validation failed.",
-                _validation_details(exc),
+                _validation_message(details),
+                details,
             ),
         )
 
@@ -113,6 +198,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def handle_unexpected(_request: Request, exc: Exception) -> JSONResponse:
+        logger.exception("unhandled_error")
         log_event(logger, "unhandled_error", error_type=type(exc).__name__)
         return JSONResponse(
             status_code=500,

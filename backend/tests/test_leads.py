@@ -541,6 +541,16 @@ async def test_lead_validation_rejects_incomplete_or_unknown_values(client):
     )
     assert bad_mobile.status_code == 422
     assert bad_mobile.json()["error"]["details"][0]["field"] == "mobile"
+    assert bad_mobile.json()["error"]["message"] == "Mobile number must be 10 or 12 digits."
+
+    bad_email = await client.post(
+        "/api/v1/leads",
+        json=_lead_payload(email="not-an-email", project_id=str(project_id)),
+        headers=headers,
+    )
+    assert bad_email.status_code == 422
+    assert bad_email.json()["error"]["message"] == "Enter a valid email address."
+    assert bad_email.json()["error"]["details"][0]["field"] == "email"
 
     bad_status = await client.post(
         "/api/v1/leads",

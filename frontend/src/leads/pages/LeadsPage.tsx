@@ -505,6 +505,8 @@ export function LeadsPage() {
     }
     if (!form.lead_source) next.lead_source = 'Choose a source.'
     if (!form.enquiry_date.trim()) next.enquiry_date = 'Choose the enquiry date.'
+    const email = form.email.trim()
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email address.'
     for (const field of activeFields) {
       if (!field.is_required) continue
       const value = form.extra_values[field.key]
@@ -651,7 +653,18 @@ export function LeadsPage() {
             value={form.email}
             fullWidth
             disabled={disabled}
-            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            error={Boolean(fieldErrors.email)}
+            helperText={fieldErrors.email}
+            onChange={(event) => {
+              setForm((current) => ({ ...current, email: event.target.value }))
+              if (fieldErrors.email) {
+                setFieldErrors((current) => {
+                  const next = { ...current }
+                  delete next.email
+                  return next
+                })
+              }
+            }}
           />
         </Stack>
 
@@ -678,6 +691,8 @@ export function LeadsPage() {
             value={form.city}
             fullWidth
             disabled={disabled}
+            error={Boolean(fieldErrors.city)}
+            helperText={fieldErrors.city}
             onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
           />
         </Stack>
@@ -701,6 +716,8 @@ export function LeadsPage() {
             fullWidth
             disabled={disabled}
             placeholder="Who referred them?"
+            error={Boolean(fieldErrors.reference_name)}
+            helperText={fieldErrors.reference_name}
             onChange={(event) => setForm((current) => ({ ...current, reference_name: event.target.value }))}
           />
         </Stack>
@@ -713,6 +730,8 @@ export function LeadsPage() {
           minRows={2}
           disabled={disabled}
           placeholder="What are they looking for?"
+          error={Boolean(fieldErrors.requirement)}
+          helperText={fieldErrors.requirement}
           onChange={(event) => setForm((current) => ({ ...current, requirement: event.target.value }))}
         />
 
@@ -724,6 +743,8 @@ export function LeadsPage() {
           minRows={2}
           disabled={disabled}
           placeholder="Notes from the call"
+          error={Boolean(fieldErrors.call_summary)}
+          helperText={fieldErrors.call_summary}
           onChange={(event) => setForm((current) => ({ ...current, call_summary: event.target.value }))}
         />
 
