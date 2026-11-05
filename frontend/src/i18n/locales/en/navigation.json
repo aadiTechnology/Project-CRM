@@ -31,7 +31,7 @@
     "leads": "Leads",
     "pipeline": "Pipeline",
     "followUps": "Follow-ups",
-    "kpis": "KPIs",
+    "kpis": "Dashboard",
     "campaigns": "Campaigns"
   },
   "hints": {
@@ -45,7 +45,7 @@
     "leads": "Enquiries for the projects you can open. A salesperson creates them. An owner reviews them. Use Manage fields for extra columns.",
     "pipeline": "Kanban board by stage. Owners can add, recolor, reorder, or remove stages. New leads start in New.",
     "followUps": "Open follow-ups with the plan step, due date, and priority.",
-    "kpis": "Won value, pipeline value, and counts by status and source.",
+    "kpis": "Today’s calls, overdue follow-ups, and how the team is working. Amounts appear only when someone entered one.",
     "campaigns": "Leads and won value by source, split by project. Read only."
   },
   "roleIntro": {

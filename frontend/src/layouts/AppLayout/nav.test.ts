@@ -22,6 +22,7 @@ describe('homePathForRoles', () => {
 describe('visibleNav', () => {
   it('gives a salesperson their lead menu and hides setup', () => {
     expect(ids(['SALESPERSON'])).toEqual([
+      'kpis',
       'projects',
       'reminders',
       'leads',
@@ -33,6 +34,7 @@ describe('visibleNav', () => {
   it('gives a business owner the team and a view of every lead', () => {
     expect(ids(['BUSINESS_OWNER'])).toEqual([
       'home',
+      'kpis',
       'projects',
       'team',
       'leads',
@@ -42,7 +44,7 @@ describe('visibleNav', () => {
   })
 
   it('gives a super admin businesses, projects, users, roles, and team', () => {
-    expect(ids(['SUPER_ADMIN'])).toEqual(['businesses', 'projects', 'users', 'roles', 'team'])
+    expect(ids(['SUPER_ADMIN'])).toEqual(['businesses', 'kpis', 'projects', 'users', 'roles', 'team'])
   })
 
   it('gives marketing campaigns only', () => {

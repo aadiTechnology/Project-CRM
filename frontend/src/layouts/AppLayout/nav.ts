@@ -1,5 +1,6 @@
 import type { SvgIconComponent } from '@mui/icons-material'
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
+import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
 import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined'
 import DomainOutlinedIcon from '@mui/icons-material/DomainOutlined'
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
@@ -35,6 +36,14 @@ export type NavItem = {
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'businesses', path: '/app/businesses', section: 'menu', roles: SUPER_ADMIN, ready: true, icon: DomainOutlinedIcon },
   { id: 'home', path: '/app', section: 'menu', roles: OWNER, icon: HomeOutlinedIcon },
+  {
+    id: 'kpis',
+    path: '/app/kpis',
+    section: 'menu',
+    roles: [...SUPER_ADMIN, ...OWNER, ...SALES],
+    ready: true,
+    icon: SpaceDashboardOutlinedIcon,
+  },
   { id: 'projects', path: '/app/projects', section: 'menu', roles: [...SUPER_ADMIN, ...OWNER, ...SALES], ready: true, icon: WorkOutlineOutlinedIcon },
   {
     id: 'users',
@@ -64,7 +73,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'leads', path: '/app/leads', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: PersonSearchOutlinedIcon },
   { id: 'pipeline', path: '/app/pipeline', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: AccountTreeOutlinedIcon },
   { id: 'followUps', path: '/app/follow-ups', section: 'menu', roles: [...OWNER, ...SALES], ready: true, icon: TaskAltOutlinedIcon },
-  // KPIs: route kept in AppRoutes; intentionally omitted from sidebar.
   { id: 'campaigns', path: '/app/campaigns', section: 'menu', roles: MARKETING, icon: CampaignOutlinedIcon },
 ]
 

@@ -74,7 +74,14 @@ export function AppRoutes() {
         <Route path="pipeline" element={<PipelinePage />} />
         <Route path="reminders" element={<RemindersPage />} />
         <Route path="follow-ups" element={<FollowUpsPage />} />
-        <Route path="kpis" element={<KpisPage />} />
+        <Route
+          path="kpis"
+          element={
+            <PermissionRoute permission="leads.read">
+              <KpisPage />
+            </PermissionRoute>
+          }
+        />
         <Route
           path="users"
           element={
