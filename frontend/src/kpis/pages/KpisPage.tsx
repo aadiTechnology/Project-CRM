@@ -6,7 +6,6 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined'
 import EventBusyOutlinedIcon from '@mui/icons-material/EventBusyOutlined'
 import FiberNewOutlinedIcon from '@mui/icons-material/FiberNewOutlined'
-import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
 import StarOutlineIcon from '@mui/icons-material/StarOutline'
 import HighlightOffOutlinedIcon from '@mui/icons-material/HighlightOffOutlined'
 import DomainOutlinedIcon from '@mui/icons-material/DomainOutlined'
@@ -100,7 +99,6 @@ const ICONS: Record<string, typeof GroupsOutlinedIcon> = {
   never_called: PersonOffOutlinedIcon,
   no_followup: EventBusyOutlinedIcon,
   still_new: FiberNewOutlinedIcon,
-  aging_new: HistoryOutlinedIcon,
   won: StarOutlineIcon,
   lost: HighlightOffOutlinedIcon,
   salespeople: GroupsOutlinedIcon,
@@ -135,7 +133,6 @@ const CARD_KEYS = [
   'never_called',
   'no_followup',
   'still_new',
-  'aging_new',
   'lost',
   'salespeople',
   'new_leads',
@@ -206,7 +203,6 @@ function cardPath(role: Dashboard['role'], key: string): string | null {
     key === 'total' ||
     key === 'never_called' ||
     key === 'still_new' ||
-    key === 'aging_new' ||
     key === 'new_leads' ||
     key === 'leads'
   ) {
@@ -389,8 +385,16 @@ export function KpisPage() {
             label="From"
             type="date"
             value={dateFrom}
-            onChange={(event) => setDateFrom(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={(event) => {
+              const next = event.target.value
+              const today = todayInput()
+              if (next && (next > today || (dateTo && next > dateTo))) return
+              setDateFrom(next)
+            }}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { max: dateTo && dateTo < todayInput() ? dateTo : todayInput() },
+            }}
             sx={{ width: { xs: '100%', sm: 160 } }}
           />
           <TextField
@@ -398,8 +402,15 @@ export function KpisPage() {
             label="To"
             type="date"
             value={dateTo}
-            onChange={(event) => setDateTo(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
+            onChange={(event) => {
+              const next = event.target.value
+              if (next && dateFrom && next < dateFrom) return
+              setDateTo(next)
+            }}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { min: dateFrom || undefined },
+            }}
             sx={{ width: { xs: '100%', sm: 160 } }}
           />
           <CardChooser cards={data?.cards ?? []} visibility={cardVisibility} onToggle={toggleCard} onReset={resetCards} />
@@ -544,7 +555,7 @@ export function KpisPage() {
             alignItems: 'stretch',
           }}
         >
-          <Section title="Stages" hint="Where the leads on this view sit." fill>
+          <Section title="Pipeline" hint="Where leads added in the selected dates sit." fill>
             <Stack spacing={1.25}>
               {data.stages.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
@@ -576,7 +587,7 @@ export function KpisPage() {
               )}
             </Stack>
           </Section>
-          <Section title="Sources" hint="Where these leads came from." fill>
+          <Section title="Sources" hint="Where leads added in the selected dates came from." fill>
             <Stack spacing={1.25}>
                 {data.sources.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
@@ -725,7 +736,7 @@ function PersonCard({ person }: { person: Person }) {
     <Box sx={{ p: 1.5, borderRadius: '12px', border: '1px solid', borderColor: person.overdue ? '#fecaca' : 'divider' }}>
       <Typography fontWeight={700}>{person.name}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        {person.leads} leads · {person.calls_today} calls today ({person.connected} connected, {person.no_answer} no answer)
+        {person.leads} leads · {person.calls_today} calls ({person.connected} connected, {person.no_answer} no answer)
       </Typography>
       <Typography variant="body2" sx={{ mt: 0.5 }} color={person.overdue ? 'error.main' : 'text.secondary'}>
         {person.overdue} overdue · {person.still_new} still new · {person.won} won · {person.lost} lost

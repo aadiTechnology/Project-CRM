@@ -56,13 +56,9 @@ def _role(user: User) -> str:
     return "salesperson"
 
 
-def _day_bounds(now: datetime | None = None) -> tuple[datetime, datetime, datetime, datetime]:
+def _today_start(now: datetime | None = None) -> datetime:
     clock = now.astimezone(IST) if now else datetime.now(IST)
-    start = datetime(clock.year, clock.month, clock.day, tzinfo=IST)
-    tomorrow = start + timedelta(days=1)
-    week = start - timedelta(days=start.weekday())
-    aging = start - timedelta(days=3)
-    return start, tomorrow, week, aging
+    return datetime(clock.year, clock.month, clock.day, tzinfo=IST)
 
 
 def _local_day(value: datetime) -> datetime:
@@ -88,8 +84,8 @@ def _selected_range(
     date_from: date | None,
     date_to: date | None,
     now: datetime | None,
-) -> tuple[datetime, datetime, datetime, datetime]:
-    today_start, tomorrow, _week, aging = _day_bounds(now)
+) -> tuple[datetime, datetime, datetime]:
+    today_start = _today_start(now)
     start_day = date_from or date_to or today_start.date()
     end_day = date_to or date_from or today_start.date()
     if end_day < start_day:
@@ -98,7 +94,7 @@ def _selected_range(
     end = datetime(end_day.year, end_day.month, end_day.day, tzinfo=IST) + timedelta(days=1)
     if (end - start).days > 366:
         raise _validation("Choose a date range of one year or less.")
-    return start, end, today_start, aging
+    return start, end, today_start
 
 
 def build_kpi_dashboard(
@@ -113,7 +109,7 @@ def build_kpi_dashboard(
     now: datetime | None = None,
 ) -> KpiDashboardData:
     role = _role(actor)
-    range_start, range_end, today_start, aging = _selected_range(date_from, date_to, now)
+    range_start, range_end, today_start = _selected_range(date_from, date_to, now)
     if role == "admin" and project_id is None:
         if company_id is None:
             return _admin_businesses(db, range_start, range_end, today_start)
@@ -127,7 +123,6 @@ def build_kpi_dashboard(
         range_start=range_start,
         range_end=range_end,
         today_start=today_start,
-        aging=aging,
     )
 
 
@@ -207,10 +202,10 @@ def _admin_businesses(
         overdue = 0
         week_count = 0
         project_overdue: set[uuid.UUID] = set()
-        for lead in company_leads:
-            if range_start <= _created_at(lead) < range_end:
-                week_count += 1
-                leads_week += 1
+        ranged_leads = [lead for lead in company_leads if _lead_in_range(lead, range_start, range_end)]
+        week_count = len(ranged_leads)
+        leads_week += week_count
+        for lead in ranged_leads:
             if _is_overdue(lead, stages, today):
                 overdue += 1
                 if lead.project_id is not None:
@@ -228,7 +223,7 @@ def _admin_businesses(
                 name=company.name,
                 projects=len(projects_by_company.get(company.id, [])),
                 users=int(user_counts.get(company.id, 0)),
-                leads=len(company_leads),
+                leads=week_count,
                 leads_this_week=week_count,
                 overdue=overdue,
                 calls_today=calls_by_company[company.id],
@@ -240,7 +235,7 @@ def _admin_businesses(
         _card("businesses", "Businesses", len(companies), "Active organisations"),
         _card("projects", "Projects", sum(len(ids) for ids in projects_by_company.values()), "Active projects"),
         _card("users", "Users", sum(int(count) for count in user_counts.values()), "Active people"),
-        _card("leads", "Leads", len(leads), "Across every business"),
+        _card("leads", "Leads", leads_week, "Added in the selected dates"),
         _card("leads_week", "New leads", leads_week, "Added in the selected dates"),
         _card(
             "overdue_projects",
@@ -313,7 +308,11 @@ def _admin_projects(
     today = today_start.date()
     rows: list[ProjectRow] = []
     for project in projects:
-        project_leads = [lead for lead in leads if lead.project_id == project.id]
+        project_leads = [
+            lead
+            for lead in leads
+            if lead.project_id == project.id and _lead_in_range(lead, range_start, range_end)
+        ]
         rows.append(
             ProjectRow(
                 project_id=str(project.id),
@@ -334,7 +333,7 @@ def _admin_projects(
         subtitle=f"Projects in {company.name}. Open one for the team’s calls.",
         cards=[
             _card("projects", "Projects", len(rows), company.name),
-            _card("leads", "Leads", len(leads), "Open and closed"),
+            _card("leads", "Leads", sum(row.leads for row in rows), "Added in the selected dates"),
             _card(
                 "overdue_projects",
                 "With overdue",
@@ -371,7 +370,6 @@ def _work_dashboard(
     range_start: datetime,
     range_end: datetime,
     today_start: datetime,
-    aging: datetime,
 ) -> KpiDashboardData:
     scope = resolve_record_scope(db, actor)
     conditions = [Lead.is_deleted.is_(False)]
@@ -391,20 +389,24 @@ def _work_dashboard(
     stages = _stage_flags(db, project_ids)
     roster_ids = [lead.id for lead in project_leads]
     roster_calls = _calls_between(db, roster_ids, range_start, range_end)
+    ranged_leads = [lead for lead in project_leads if _lead_in_range(lead, range_start, range_end)]
     today = today_start.date()
     people: list[PersonRow] = []
     if project_id is not None and role != "salesperson":
-        people = _people(db, project_id, project_leads, stages, roster_calls, today)
+        people = _people(db, project_id, ranged_leads, stages, roster_calls, today)
     focus_name = ""
-    leads = project_leads
+    leads = ranged_leads
+    call_leads = project_leads
     if user_id is not None and project_id is not None and role != "salesperson":
         match = next((person for person in people if person.user_id == str(user_id)), None)
         if match is None:
             raise _validation("Choose a salesperson on this project.")
         focus_name = match.name
-        leads = [lead for lead in project_leads if lead.owner_id == user_id]
+        leads = [lead for lead in ranged_leads if lead.owner_id == user_id]
+        call_leads = [lead for lead in project_leads if lead.owner_id == user_id]
     lead_ids = [lead.id for lead in leads]
-    calls_in_range = _calls_between(db, lead_ids, range_start, range_end)
+    call_ids = [lead.id for lead in call_leads]
+    calls_in_range = _calls_between(db, call_ids, range_start, range_end)
     called_ever = set(db.scalars(select(LeadCall.lead_id).where(LeadCall.lead_id.in_(lead_ids))).all()) if lead_ids else set()
     view = "mine" if role == "salesperson" or focus_name else "project"
     summary = _summarize(
@@ -415,15 +417,14 @@ def _work_dashboard(
         today=today,
         range_start=range_start,
         range_end=range_end,
-        aging=aging,
-        won_ids=_moved_ids(db, lead_ids, range_start, range_end, "won"),
-        lost_ids=_moved_ids(db, lead_ids, range_start, range_end, "lost"),
+        won_ids=_moved_ids(db, call_ids, range_start, range_end, "won"),
+        lost_ids=_moved_ids(db, call_ids, range_start, range_end, "lost"),
     )
     money = _money_foot(leads, stages) if role != "salesperson" else None
     if focus_name:
-        subtitle = f"{focus_name}'s leads and the calls on them today."
+        subtitle = f"{focus_name}'s leads and calls in the selected dates."
     elif view == "mine":
-        subtitle = "Your leads and the calls you logged today."
+        subtitle = "Your leads and calls in the selected dates."
     elif project_id is None:
         subtitle = "Every lead you can see. Pick a project to see each salesperson."
     else:
@@ -457,13 +458,12 @@ def _summarize(
     today,
     range_start: datetime,
     range_end: datetime,
-    aging: datetime,
     won_ids: set[uuid.UUID],
     lost_ids: set[uuid.UUID],
 ) -> dict:
     status_counts: Counter[str] = Counter()
     source_counts: Counter[str] = Counter()
-    due_today = overdue = never_called = no_followup = still_new = aging_new = 0
+    due_today = overdue = never_called = no_followup = still_new = 0
     won = lost = new_week = 0
     for lead in leads:
         status = normalize_status(lead.status)
@@ -481,9 +481,7 @@ def _summarize(
             lost += 1
         if is_entry:
             still_new += 1
-            if _created_at(lead) < aging:
-                aging_new += 1
-        if range_start <= _created_at(lead) < range_end:
+        if _lead_in_range(lead, range_start, range_end):
             new_week += 1
         if not closed and lead.next_followup_at is None:
             no_followup += 1
@@ -530,7 +528,6 @@ def _summarize(
         "never_called": never_called,
         "no_followup": no_followup,
         "still_new": still_new,
-        "aging_new": aging_new,
         "won": won,
         "lost": lost,
         "calls_today": len(calls_in_range),
@@ -550,9 +547,8 @@ def _summarize(
 
 
 def _work_cards(view: str, summary: dict) -> list[KpiCard]:
-    lead_hint = "Leads on this view" if view == "project" else "Leads you can open"
     shared = [
-        _card("total", "Total leads", summary["total"], lead_hint),
+        _card("total", "Total leads", summary["total"], "Added in the selected dates"),
         _card("connected", "Connected", summary["connected"], "Calls where someone picked up"),
         _card("not_connected", "Not connected", summary["no_answer"], "Calls with no answer"),
         _card("won", "Won", summary["won"], "Leads marked won", tone="good" if summary["won"] else "default"),
@@ -568,13 +564,6 @@ def _work_cards(view: str, summary: dict) -> list[KpiCard]:
         _card("never_called", "Never called", summary["never_called"], "No call and no imported note"),
         _card("no_followup", "No next follow-up", summary["no_followup"], "Open leads with no due date"),
         _card("still_new", "Still new", summary["still_new"], "Leads that have not moved"),
-        _card(
-            "aging_new",
-            "New for 3+ days",
-            summary["aging_new"],
-            "Still on New after three days",
-            tone="attention" if summary["aging_new"] else "default",
-        ),
         _card("lost", "Lost", summary["lost"], "Leads marked lost"),
     ]
     if view == "mine":
@@ -650,7 +639,7 @@ def _work_cards_with_roster(cards: list[KpiCard], people: list[PersonRow]) -> li
         "salespeople",
         "Salespeople",
         len(people),
-        f"{called} logged a call today",
+        f"{called} logged a call in the selected dates",
         tone="attention" if called < len(people) else "good",
     )
     return [roster, *cards]
@@ -753,11 +742,17 @@ def _salesperson_counts(db: Session, project_ids: list[uuid.UUID]) -> dict[uuid.
     return {project_id: int(count) for project_id, count in rows}
 
 
-def _created_at(lead: Lead) -> datetime:
-    value = lead.created_at
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value
+def _lead_on(lead: Lead) -> date:
+    """Enquiry date is the lead's own date. Leads without one use the day they were added."""
+
+    if lead.enquiry_date is not None:
+        return lead.enquiry_date
+    return _local_day(lead.created_at).date()
+
+
+def _lead_in_range(lead: Lead, start: datetime, end: datetime) -> bool:
+    day = _lead_on(lead)
+    return start.date() <= day < end.date()
 
 
 def _flags(lead: Lead, stages: dict) -> dict:

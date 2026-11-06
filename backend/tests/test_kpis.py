@@ -1,7 +1,8 @@
 """Dashboard numbers stay inside the caller's role."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
@@ -133,3 +134,71 @@ async def test_dashboard_changes_with_role(client):
     assert admin_body["view"] == "businesses"
     assert any(row["name"] == "Dashboard Co" for row in admin_body["businesses"])
     assert admin_body["money"] is None
+
+
+async def test_dashboard_date_range_changes_the_lead_counts(client):
+    company_id = _add_company("Range Co")
+    owner_id = _add_member("range-owner@example.com", "BUSINESS_OWNER", company_id)
+    rep_id = _add_member("range-rep@example.com", "SALESPERSON", company_id)
+    project_id = _add_project(company_id, [owner_id, rep_id])
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    earlier = today - timedelta(days=10)
+
+    assert (await login(client, email="range-rep@example.com")).status_code == 200
+    headers = await csrf_headers(client)
+    created_ids = {}
+    for name, mobile, enquiry in (
+        ("Older Lead", "9876501001", earlier.isoformat()),
+        ("Today Lead", "9876501002", today.isoformat()),
+    ):
+        created = await client.post(
+            "/api/v1/leads",
+            json={
+                "full_name": name,
+                "mobile": mobile,
+                "project_id": str(project_id),
+                "lead_source": "Website",
+                "enquiry_date": enquiry,
+                "next_followup_at": "2026-11-06T10:30:00Z",
+            },
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        created_ids[name] = created.json()["data"]["id"]
+
+    called = await client.post(
+        f"/api/v1/leads/{created_ids['Older Lead']}/calls",
+        json={"outcome": "connected", "summary": "Spoke today about an older enquiry"},
+        headers=headers,
+    )
+    assert called.status_code == 201, called.text
+
+    def total_of(body: dict) -> str:
+        return next(card["value"] for card in body["cards"] if card["key"] == "total")
+
+    def connected_of(body: dict) -> str:
+        return next(card["value"] for card in body["cards"] if card["key"] == "connected")
+
+    older = await client.get(f"/api/v1/kpis?project_id={project_id}&date_from={earlier}&date_to={earlier}")
+    assert older.status_code == 200, older.text
+    older_body = older.json()["data"]
+    assert total_of(older_body) == "1"
+    assert connected_of(older_body) == "0"
+    assert older_body["sources"] == [{"source": "Website", "count": 1}]
+
+    current = await client.get(f"/api/v1/kpis?project_id={project_id}&date_from={today}&date_to={today}")
+    assert current.status_code == 200, current.text
+    current_body = current.json()["data"]
+    assert total_of(current_body) == "1"
+    assert connected_of(current_body) == "1"
+
+    both = await client.get(f"/api/v1/kpis?project_id={project_id}&date_from={earlier}&date_to={today}")
+    assert both.status_code == 200, both.text
+    assert total_of(both.json()["data"]) == "2"
+
+    assert (await login(client, email="range-owner@example.com")).status_code == 200
+    team = await client.get(f"/api/v1/kpis?project_id={project_id}&date_from={earlier}&date_to={earlier}")
+    assert team.status_code == 200, team.text
+    team_body = team.json()["data"]
+    assert team_body["people"][0]["leads"] == 1
+    assert team_body["people"][0]["calls_today"] == 0
