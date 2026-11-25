@@ -1,0 +1,48 @@
+# STAGING for Coolify (Docker Compose build pack): a copy of the CRM that uses a database on the shared
+# aadi-platform-postgres server instead of a Postgres of its own. Deployed from the `staging` branch.
+# Domain: give the crmstg-web service https://crmstg.aaditechnology.com:8080 (the API is not public).
+#
+# Email is written to a file (EMAIL_BACKEND=file), never sent, because staging holds a copy of real data.
+# The API joins the external `coolify` network only to reach the shared database. Its service name is
+# unique (crmstg-api) so it cannot be confused with another stack's `api` on that network.
+services:
+  crmstg-web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - crmstg-api
+    expose:
+      - "8080"
+    environment:
+      NGINX_MAX_BODY: ${NGINX_MAX_BODY:-25m}
+      API_UPSTREAM: http://crmstg-api:8000
+
+  crmstg-api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgresql+psycopg://crm_staging:${STAGING_DB_PASSWORD:?set STAGING_DB_PASSWORD}@${STAGING_DB_HOST:-cmxmth6k91dspo6qan1xzeg5}:5432/crm_staging
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random characters)}
+      CORS_ORIGINS: ${APP_BASE_URL:?set APP_BASE_URL}
+      FRONTEND_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
+      EMAIL_BACKEND: file
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+    volumes:
+      - crmstg_outbox:/app/var
+    networks:
+      - default
+      - coolify
+
+networks:
+  coolify:
+    external: true
+
+volumes:
+  crmstg_outbox:
